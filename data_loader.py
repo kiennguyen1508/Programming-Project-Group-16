@@ -40,5 +40,19 @@ def download():
     print(f"From {prices.index[0].date()} to {prices.index[-1].date()}")
     print(prices.tail())
 
+def get_prices(start = None , end = None):
+    """
+    Daily closing prices from the saved CSV, one column per asset.
+    """
+    prices = pd.read_csv(CSV , index_col="Date" , parse_dates = True)
+    return prices.loc[start : end]
+
+def get_returns(start = None , end = None):
+    """
+    Daily log returns: the same definition for every panel.
+    """
+    return np.log(get_prices(start , end)).diff().dropna()
+
+
 if __name__ == "__main__":
     download()
