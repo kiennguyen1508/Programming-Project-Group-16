@@ -29,7 +29,14 @@ def render():
         f"Daily closes from {recent.index[0].date()} to {recent.index[-1].date()} "
         f"({len(recent)} trading days)"
     )
-    rebased = recent / recent.iloc[0] * 100
+    selected = st.multiselect(
+        "Assets",
+        options = list(COLOURS),
+        default = list(COLOURS),
+        key = "p1_assets",
+    )
+    chosen = recent[selected]
+    rebased = chosen / chosen.iloc[0] * 100 
     st.plotly_chart(make_price_chart(rebased))
 
 def make_price_chart(rebased):
