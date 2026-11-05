@@ -9,6 +9,10 @@ from data_loader import get_prices, SPLIT
 
 
 COLOURS = {"Gold": "#B45309", "Silver": "#7C8798", "Oil": "#0F766E", "S&P 500": "#2563EB"}
+RATIOS = {
+    "Gold / Silver" : ("Gold", "Silver"),
+    "Gold / Oil" : ("Gold" , "Oil"),
+}
 
 @st.cache_data
 def load_prices():
@@ -25,6 +29,7 @@ def render():
 
     prices = load_prices()
 
+    view = st.radio("View" , ["Prices" , "Ratios"] , horizontal = True , key = "p1_view")
     period = st.radio(
         "Period",
         ["Since 2025" , "YTD" , "1Y" , "5Y" , "Max"],
@@ -37,18 +42,23 @@ def render():
         f"Daily closes from {recent.index[0].date()} to {recent.index[-1].date()} "
         f"({len(recent)} trading days)"
     )
-    selected = st.multiselect(
-        "Assets",
-        options = list(COLOURS),
-        default = list(COLOURS),
-        key = "p1_assets",
-    )
-    log_scale = st.toggle("Log scale" , key = "p1_log")
+    if view == "Prices":
+        selected = st.multiselect(
+            "Assets",
+            options = list(COLOURS),
+            default = list(COLOURS),
+            key = "p1_assets",
+        )
+        log_scale = st.toggle("Log scale" , key = "p1_log")
+        chosen = recent[selected]
+        rebased = chosen / chosen.iloc[0] * 100
+        st.plotly_chart(make_price_chart(rebased , log_scale))
 
-    chosen = recent[selected]
-    rebased = chosen / chosen.iloc[0] * 100 
-    st.plotly_chart(make_price_chart(rebased, log_scale))
-
+    else:
+        name = st.radio("Ratio" , list(RATIOS) , horizontal = True , key = "p1_ratio")
+        top, bottom = RATIOS[name]
+        ratio = recent[top] / recent[bottom]
+        st.plotly_chart(make_ratio_chart(ratio , name))
 
 def start_date(prices, period):
     """
@@ -90,4 +100,26 @@ def make_price_chart(rebased, log_scale = False):
     )
     if log_scale:
         fig.update_yaxes(type = "log")
+    return fig
+
+def make_ratio_chart(ratio, name):
+    """
+    Line chart of one price ratio over time.
+    """
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(
+        x = ratio.index,
+        y = ratio,
+        name = name,
+        mode = "lines",
+        line = dict(color = COLOURS["Gold"], width = 2),
+        hovertemplate = "%{y:.1f}",
+    ))
+    fig.update_layout(
+        height = 420,
+        hovermode = "x unified",
+        yaxis_title = f"{name} ratio",
+        showlegend = False,
+        margin = dict(l=10 , r=10 , t=30 , b=10),
+    )
     return fig
