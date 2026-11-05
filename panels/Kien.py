@@ -3,6 +3,7 @@ Panel 1: Performance and ratios (Kien).
 """
 import streamlit as st
 import plotly.graph_objects as go
+import pandas as pd
 
 from data_loader import get_prices, SPLIT
 
@@ -23,7 +24,14 @@ def render():
     st.subheader("Performance & ratios")
 
     prices = load_prices()
-    recent = prices.loc[SPLIT:]
+
+    period = st.radio(
+        "Period",
+        ["Since 2025" , "YTD" , "1Y" , "5Y" , "Max"],
+        horizontal = True,
+        key = "p1_period",
+    )
+    recent = prices.loc[start_date(prices, period):]
 
     st.caption(
         f"Daily closes from {recent.index[0].date()} to {recent.index[-1].date()} "
@@ -38,6 +46,23 @@ def render():
     chosen = recent[selected]
     rebased = chosen / chosen.iloc[0] * 100 
     st.plotly_chart(make_price_chart(rebased))
+
+
+def start_date(prices, period):
+    """
+    Turn a period label into the first date to show.
+    """
+    last = prices.index[-1]
+    if period == "Since 2025":
+        return pd.Timestamp(SPLIT)
+    if period == "YTD":
+        return pd.Timestamp(year = last.year , month = 1 , day = 1)
+    if period == "1Y":
+        return last - pd.DateOffset(years = 1)
+    if period == "5Y":
+        return last - pd.DateOffset(years = 5)
+    return prices.index[0] #"Max"
+
 
 def make_price_chart(rebased):
     """
