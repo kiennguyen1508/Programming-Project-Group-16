@@ -43,9 +43,11 @@ def render():
         default = list(COLOURS),
         key = "p1_assets",
     )
+    log_scale = st.toggle("Log scale" , key = "p1_log")
+
     chosen = recent[selected]
     rebased = chosen / chosen.iloc[0] * 100 
-    st.plotly_chart(make_price_chart(rebased))
+    st.plotly_chart(make_price_chart(rebased, log_scale))
 
 
 def start_date(prices, period):
@@ -64,7 +66,7 @@ def start_date(prices, period):
     return prices.index[0] #"Max"
 
 
-def make_price_chart(rebased):
+def make_price_chart(rebased, log_scale = False):
     """
     Line chart of each asset, rebased so every line starts at 100.
     """
@@ -86,4 +88,6 @@ def make_price_chart(rebased):
         legend = dict(orientation = "h" , y = 1.1),
         margin = dict(l=10 , r=10 , t=30 , b=10),
     )
+    if log_scale:
+        fig.update_yaxes(type = "log")
     return fig
