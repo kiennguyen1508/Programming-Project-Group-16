@@ -4,6 +4,7 @@ Panel 1: Performance and ratios (Kien).
 import streamlit as st
 import plotly.graph_objects as go
 import pandas as pd
+import numpy as np
 
 from data_loader import get_prices, SPLIT
 
@@ -13,6 +14,7 @@ RATIOS = {
     "Gold / Silver" : ("Gold", "Silver"),
     "Gold / Oil" : ("Gold" , "Oil"),
 }
+TRADING_DAYS = 252 #trading days in a year, used to annualise
 
 @st.cache_data
 def load_prices():
@@ -53,6 +55,7 @@ def render():
         chosen = recent[selected]
         rebased = chosen / chosen.iloc[0] * 100
         st.plotly_chart(make_price_chart(rebased , log_scale))
+        st.dataframe(performance_stats(chosen).style.format("{:.1%}"))
 
     else:
         name = st.radio("Ratio" , list(RATIOS) , horizontal = True , key = "p1_ratio")
@@ -155,3 +158,16 @@ def ratio_stats(full):
         "z" : (current - mean) / std,
         "percentile" : (full < current).mean() * 100,
     }
+
+def performance_stats(prices):
+    """
+    Total return, annualised return and annualised volatility for each asset.
+    """
+    returns = np.log(prices).diff().dropna()
+    years = len(returns) / TRADING_DAYS
+    total = prices.iloc[-1] / prices.iloc[0] - 1
+    return pd.DataFrame({
+        "Total return": total,
+        "Annualised return": (1 + total) ** (1 / years) - 1,
+        "Volatility (ann.)" : returns.std() * np.sqrt(TRADING_DAYS),
+    })
