@@ -59,8 +59,15 @@ def render():
         top, bottom = RATIOS[name]
         ratio = recent[top] / recent[bottom]
         full = prices[top] / prices[bottom]
-        mean, std = full.mean(), full.std()
-        st.plotly_chart(make_ratio_chart(ratio, name, mean, std))
+        stats = ratio_stats(full)
+        st.plotly_chart(make_ratio_chart(ratio, name, stats["mean"], stats["std"]))
+
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Current ratio" , f"{stats['current']:.1f}")
+        c2.metric("Z-score" , f"{stats['z']:+.2f}σ",
+                  help = "How many standard deviations today's ratio is from its 2015-2026 average")
+        c3.metric("Percentile" , f"{stats['percentile']:.0f}%",
+                  help = "Share of days since 2015 when the ratio was lower than today")
 
 def start_date(prices, period):
     """
@@ -133,3 +140,18 @@ def make_ratio_chart(ratio, name, mean, std):
         margin = dict (l=10, r=50, t=30, b=10),
     )
     return fig
+
+
+def ratio_stats(full):
+    """
+    Where today's ratio sits compared with its full history since 2015.
+    """
+    current = full.iloc[-1]
+    mean, std = full.mean(), full.std()
+    return{
+        "current" : current,
+        "mean" : mean,
+        "std" : std,
+        "z" : (current - mean) / std,
+        "percentile" : (full < current).mean() * 100,
+    }
