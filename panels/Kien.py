@@ -58,7 +58,9 @@ def render():
         name = st.radio("Ratio" , list(RATIOS) , horizontal = True , key = "p1_ratio")
         top, bottom = RATIOS[name]
         ratio = recent[top] / recent[bottom]
-        st.plotly_chart(make_ratio_chart(ratio , name))
+        full = prices[top] / prices[bottom]
+        mean, std = full.mean(), full.std()
+        st.plotly_chart(make_ratio_chart(ratio, name, mean, std))
 
 def start_date(prices, period):
     """
@@ -102,9 +104,9 @@ def make_price_chart(rebased, log_scale = False):
         fig.update_yaxes(type = "log")
     return fig
 
-def make_ratio_chart(ratio, name):
+def make_ratio_chart(ratio, name, mean, std):
     """
-    Line chart of one price ratio over time.
+    Line chart of one price ratio, with its long-run mean and ±1σ/±2σ bands. 
     """
     fig = go.Figure()
     fig.add_trace(go.Scatter(
@@ -112,14 +114,22 @@ def make_ratio_chart(ratio, name):
         y = ratio,
         name = name,
         mode = "lines",
-        line = dict(color = COLOURS["Gold"], width = 2),
+        line = dict(color = COLOURS["Gold"] , width = 2),
         hovertemplate = "%{y:.1f}",
     ))
+    fig.add_hline(y = mean, line_color = "grey" , annotation_text = "Mean",
+                  annotation_position = "right")
+    for k, dash in [(1 , "dash") , (2 , "dot")]:
+        fig.add_hline(y=mean + k * std, line_dash = dash, line_color = "grey",
+                      annotation_text = f"+{k}σ ", annotation_position = "right")
+        fig.add_hline(y=mean - k * std, line_dash = dash , line_color = "grey",
+                      annotation_text = f"-{k}σ " , annotation_position = "right")
+
     fig.update_layout(
         height = 420,
         hovermode = "x unified",
         yaxis_title = f"{name} ratio",
         showlegend = False,
-        margin = dict(l=10 , r=10 , t=30 , b=10),
+        margin = dict (l=10, r=50, t=30, b=10),
     )
     return fig
