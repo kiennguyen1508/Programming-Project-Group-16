@@ -17,6 +17,25 @@ RATIOS = {
 TRADING_DAYS = 252 #trading days in a year, used to annualise
 RISK_FREE_RATE = 0.04 # assumed early cash return, used in the Sharpe ratio
 
+METHOD_NOTES = """
+**Data.** Daily closing prices from Yahoo Finance ('yfinance'): gold futures (GC=F),
+silver futures (SI=F), Brent crude futures (BZ=F) and the S&P 500 index (^GSPC).
+Only days when all four traded are kept.
+
+**Rebasing.** Each price is divided by its first value in the period and multiplied by 100.
+
+**Returns and risk.** Daily log returns. Annualised return = (1+total return)^(1/years) -1,
+with years = trading days ÷ 252. Volatility = standard deviation of daily returns × √252.
+Max drawdown = the largest fall from a previous peak within the period.
+Sharpe ratio = (annualised return - 4%) ÷ volatility, using an assumed 4% risk-free rate.
+
+**Ratios.** The mean and ±1σ/±2σ bands use the full 2015-2026 history, so they stay fixed when the period changes. The percentile is the share of days since 2015 with a lower ratio than today.
+
+**Limitations.** Future prices jump slightly when contracts roll over.The S&P 500 is a price index, so it excludes dividends. The ratios are skewed (they can spike far upwards but 
+not fall below zero), so the σ bands are only approximate; the percentile is more reliable. Past performance does not predict future returns.
+"""
+
+
 @st.cache_data
 def load_prices():
     """
@@ -83,6 +102,18 @@ def render():
         c3.metric("Percentile" , f"{stats['percentile']:.0f}%",
                   help = "Share of days since 2015 when the ratio was lower than today")
         st.info(ratio_summary(name,top,bottom,stats))
+
+
+    with st.expander("Method and Limitations"):
+        st.markdown(METHOD_NOTES)
+
+    st.download_button(
+        "Download price data (CSV)",
+        data = recent.to_csv().encode("utf=8"),
+        file_name=f"panell_prices_{period.replace('','_').lower()}.csv",
+        mime="text/csv",
+        key="p1_download"
+    )
 
 def start_date(prices, period):
     """
