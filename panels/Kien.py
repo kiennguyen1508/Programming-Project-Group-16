@@ -56,13 +56,17 @@ def render():
         chosen = recent[selected]
         rebased = chosen / chosen.iloc[0] * 100
         st.plotly_chart(make_price_chart(rebased , log_scale))
-        st.dataframe(performance_stats(chosen).style.format({
-            "Total return" : "{:.1%}",
-            "Annualised return" : "{:.1%}",
-            "Volatility (ann.)" : "{:.1%}",
-            "Max drawdown" : "{:.1%}",
-            "Sharpe ratio" : "{:.2f}",
-        }))
+        stats = performance_stats(chosen)
+        st.info(price_summary(stats))
+        st.dataframe(
+            stats.style.format({
+                "Total return": "{:.1%}",
+                "Annualised return": "{:.1%}",
+                "Volatility (ann.)": "{:.1%}",
+                "Max drawdown": "{:.1%}",
+                "Sharpe ratio": "{:.2f}",
+            })
+        )
 
     else:
         name = st.radio("Ratio" , list(RATIOS) , horizontal = True , key = "p1_ratio")
@@ -78,6 +82,7 @@ def render():
                   help = "How many standard deviations today's ratio is from its 2015-2026 average")
         c3.metric("Percentile" , f"{stats['percentile']:.0f}%",
                   help = "Share of days since 2015 when the ratio was lower than today")
+        st.info(ratio_summary(name,top,bottom,stats))
 
 def start_date(prices, period):
     """
@@ -183,3 +188,42 @@ def performance_stats(prices):
         "Max drawdown" : drawdown,
         "Sharpe ratio" : (annual - RISK_FREE_RATE) / vol,
     }).rename_axis("Asset")
+
+
+def price_summary(stats):
+    """One-sentence takeaway from the performance table."""
+    if stats.empty:
+        return ""
+    best = stats["Total return"].idxmax()
+    safest = stats["Sharpe ratio"].idxmax()
+    deepest = stats["Max drawdown"].idxmin()
+    if best == safest:
+        first = (f"**{best}** returned the most ({stats.loc[best, 'Total return']:+.0%}) "
+                 f"and also had the best risk-adjusted return "
+                 f"(Sharpe {stats.loc[best, 'Sharpe ratio']:.2f}).")
+    else:
+        first = (f"**{best}** returned the most ({stats.loc[best, 'Total return']:+.0%}), "
+                 f"but **{safest}** had the best risk-adjusted return "
+                 f"(Sharpe {stats.loc[safest, 'Sharpe ratio']:.2f}).")
+    second = (f" **{deepest}** had the deepest fall from a peak "
+              f"({stats.loc[deepest, 'Max drawdown']:.0%}).")
+    return first + second
+
+
+def ratio_summary(name, top, bottom, stats):
+    """One-sentence reading of where the ratio sits today."""
+    z = stats["z"]
+    if z > 2:
+        level = "at a historical extreme high"
+    elif z > 1:
+        level = "above its long-run average"
+    elif z < -2:
+        level = "at a historical extreme low"
+    elif z < -1:
+        level = "below its long-run average"
+    else:
+        level = "close to its long-run average"
+    return (f"The {name} ratio is **{stats['current']:.1f}**, {level}: higher than on "
+            f"{stats['percentile']:.0f}% of days since 2015. A high ratio means "
+            f"{bottom.lower()} is cheap relative to {top.lower()}.")
+
