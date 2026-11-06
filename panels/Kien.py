@@ -15,6 +15,7 @@ RATIOS = {
     "Gold / Oil" : ("Gold" , "Oil"),
 }
 TRADING_DAYS = 252 #trading days in a year, used to annualise
+RISK_FREE_RATE = 0.04 # assumed early cash return, used in the Sharpe ratio
 
 @st.cache_data
 def load_prices():
@@ -55,7 +56,13 @@ def render():
         chosen = recent[selected]
         rebased = chosen / chosen.iloc[0] * 100
         st.plotly_chart(make_price_chart(rebased , log_scale))
-        st.dataframe(performance_stats(chosen).style.format("{:.1%}"))
+        st.dataframe(performance_stats(chosen).style.format({
+            "Total return" : "{:.1%}",
+            "Annualised return" : "{:.1%}",
+            "Volatility (ann.)" : "{:.1%}",
+            "Max drawdown" : "{:.1%}",
+            "Sharpe ratio" : "{:.2f}",
+        }))
 
     else:
         name = st.radio("Ratio" , list(RATIOS) , horizontal = True , key = "p1_ratio")
@@ -161,13 +168,18 @@ def ratio_stats(full):
 
 def performance_stats(prices):
     """
-    Total return, annualised return and annualised volatility for each asset.
+    Return, risk and risk-adjusted return for each asset over the period.
     """
     returns = np.log(prices).diff().dropna()
     years = len(returns) / TRADING_DAYS
     total = prices.iloc[-1] / prices.iloc[0] - 1
+    annual = (1 + total) ** (1 / years) - 1
+    vol = returns.std() * np.sqrt(TRADING_DAYS)
+    drawdown = (prices / prices.cummax() -1).min()
     return pd.DataFrame({
-        "Total return": total,
-        "Annualised return": (1 + total) ** (1 / years) - 1,
-        "Volatility (ann.)" : returns.std() * np.sqrt(TRADING_DAYS),
-    })
+        "Total return" : total,
+        "Annualised return" : annual,
+        "Volatility (ann.)": vol,
+        "Max drawdown" : drawdown,
+        "Sharpe ratio" : (annual - RISK_FREE_RATE) / vol,
+    }).rename_axis("Asset")
