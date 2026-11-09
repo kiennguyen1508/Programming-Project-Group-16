@@ -32,7 +32,7 @@ Sharpe ratio = (annualised return - risk-free rate) ÷ volatility, using the rat
 **Ratios.** The mean and ±1σ/±2σ bands use the full 2015-2026 history, so they stay fixed when the period changes. The percentile is the share of days since 2015 with a lower ratio than today.
 
 **Limitations.** Futures prices jump slightly when contracts roll over.The S&P 500 is a price index, so it excludes dividends. The ratios are skewed (they can spike far upwards but 
-not fall below zero), so the σ bands are only approximate; the percentile is more reliable. Past performance does not predict future returns.
+not fall below zero), so the σ bands are only approximate; the percentile is more reliable. Past performance does not predict future returns. The reversion test uses the mean and σ of the whole sample, which includes the future (look-ahead bias), and consecutive extreme dats overlap, so the real number of independent cases is smaller than "Days" suggests.
 """
 
 
@@ -86,6 +86,7 @@ def render():
         if len(chosen) < TRADING_DAYS:
             st.caption("This period is shorter than a year, so annualised figures are extrapolated and can look extreme.")
         st.info(price_summary(stats))
+        
         st.dataframe(
             stats.style.format({
                 "Total return": "{:.1%}",
@@ -111,6 +112,23 @@ def render():
         c3.metric("Percentile" , f"{stats['percentile']:.0f}%",
                   help = "Share of days since 2015 when the ratio was lower than today")
         st.info(ratio_summary(name,top,bottom,stats))
+        st.markdown("**Do extreme readings revert?**")
+        horizon = st.select_slider(
+            "Look-ahead horizon",
+            options = [21,63,126],
+            value = 63,
+            format_func=lambda d: f"{d//21} month{'s' if d > 21 else ''}",
+            key = "p1_horizon",
+        )
+        test = reversion_test(full, horizon)
+        if test.empty:
+            st.caption("The ratio has never been beyond ±2σ, so there is nothing to test.")
+        else:
+            st.dataframe(test.style.format({
+                "Days" : "{:.0f}",
+                "Average change" : "{:+.1%}",
+                "Moved back towards mean" : "{:.0%}",
+            }))
 
 
     with st.expander("Method and Limitations"):
@@ -210,6 +228,28 @@ def ratio_stats(full):
         "z" : (current - mean) / std,
         "percentile" : (full < current).mean() * 100,
     }
+
+def reversion_test(full, horizon_days):
+    """
+    What happened to the ratio after it was more than 2σ from its mean?
+    """
+    mean, std = full.mean(), full.std()
+    future = full.shift(-horizon_days) / full - 1 # % change over the next N days
+    rows = {}
+    for label, mask, back in [
+        ("Above +2σ" , full > mean + 2 * std, future < 0),
+        ("Below  2σ" , full < mean -2 * std , future >0),
+    ]:
+        moves = future[mask].dropna()
+        if moves.empty:
+            continue
+        rows[label] = {
+            "Days" : len(moves),
+            "Average change" : moves.mean(),
+            "Moved back towards mean" : back[moves.index].mean(),
+        }
+    return pd.DataFrame(rows).T
+
 
 def performance_stats(prices, risk_free = RISK_FREE_RATE):
     """
