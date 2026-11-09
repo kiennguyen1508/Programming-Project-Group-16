@@ -27,11 +27,11 @@ Only days when all four traded are kept.
 **Returns and risk.** Daily log returns. Annualised return = (1+total return)^(1/years) -1,
 with years = trading days ÷ 252. Volatility = standard deviation of daily returns × √252.
 Max drawdown = the largest fall from a previous peak within the period.
-Sharpe ratio = (annualised return - 4%) ÷ volatility, using an assumed 4% risk-free rate.
+Sharpe ratio = (annualised return - risk-free rate) ÷ volatility, using the rate set with the slider (default 4%).
 
 **Ratios.** The mean and ±1σ/±2σ bands use the full 2015-2026 history, so they stay fixed when the period changes. The percentile is the share of days since 2015 with a lower ratio than today.
 
-**Limitations.** Future prices jump slightly when contracts roll over.The S&P 500 is a price index, so it excludes dividends. The ratios are skewed (they can spike far upwards but 
+**Limitations.** Futures prices jump slightly when contracts roll over.The S&P 500 is a price index, so it excludes dividends. The ratios are skewed (they can spike far upwards but 
 not fall below zero), so the σ bands are only approximate; the percentile is more reliable. Past performance does not predict future returns.
 """
 
@@ -78,7 +78,11 @@ def render():
         chosen = recent[selected]
         rebased = chosen / chosen.iloc[0] * 100
         st.plotly_chart(make_price_chart(rebased , log_scale))
-        stats = performance_stats(chosen)
+        rf = st.slider(
+            "Risk-free rate (%) used in the Sharpe ratio",
+            min_value=0.0 , max_value=6.0 , value=RISK_FREE_RATE * 100, step=0.25,key="p1_rf", 
+        ) / 100
+        stats = performance_stats(chosen,rf)
         if len(chosen) < TRADING_DAYS:
             st.caption("This period is shorter than a year, so annualised figures are extrapolated and can look extreme.")
         st.info(price_summary(stats))
@@ -207,7 +211,7 @@ def ratio_stats(full):
         "percentile" : (full < current).mean() * 100,
     }
 
-def performance_stats(prices):
+def performance_stats(prices, risk_free = RISK_FREE_RATE):
     """
     Return, risk and risk-adjusted return for each asset over the period.
     """
@@ -222,7 +226,7 @@ def performance_stats(prices):
         "Annualised return" : annual,
         "Volatility (ann.)": vol,
         "Max drawdown" : drawdown,
-        "Sharpe ratio" : (annual - RISK_FREE_RATE) / vol,
+        "Sharpe ratio" : (annual - risk_free) / vol,
     }).rename_axis("Asset")
 
 
