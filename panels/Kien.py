@@ -71,11 +71,16 @@ def render():
             default = list(COLOURS),
             key = "p1_assets",
         )
+        if not selected:
+            st.warning("Pick at least on asset to see the chart.")
+            return
         log_scale = st.toggle("Log scale" , key = "p1_log")
         chosen = recent[selected]
         rebased = chosen / chosen.iloc[0] * 100
         st.plotly_chart(make_price_chart(rebased , log_scale))
         stats = performance_stats(chosen)
+        if len(chosen) < TRADING_DAYS:
+            st.caption("This period is shorter than a year, so annualised figures are extrapolated and can look extreme.")
         st.info(price_summary(stats))
         st.dataframe(
             stats.style.format({
