@@ -12,6 +12,10 @@ PERIODS = {"2015-2024": ("2015-01-01", "2024-12-31"),
            "2025": ("2025-01-01", "2025-12-31"),
            "2026": ("2026-01-01", None)}
 
+RELATIONSHIPS = {"Silver vs Gold": ("Silver", ["Gold"]),
+                 "Silver vs Gold + S&P 500": ("Silver", ["Gold", "S&P 500"]),
+                 "Oil vs Gold": ("Oil", ["Gold"])}
+
 @st.cache_data
 def load_returns():
     """
@@ -77,6 +81,34 @@ def render():
     st.subheader("Silver vs gold regression")
 
     returns = load_returns()
-    by_period = results_by_period(returns, "Silver", ["Gold"], list(PERIODS))
 
+    relationship = st.radio(
+        "Relationship",
+        options = list(RELATIONSHIPS),
+        horizontal = True,
+        key = "cha_rel",
+    )
+    y_name, regressors = RELATIONSHIPS[relationship]
+
+    chosen = st.multiselect(
+        "Periods",
+        options = list(PERIODS),
+        default = list(PERIODS),
+        key = "cha_per",
+    )
+    confidence = st.select_slider(
+        "Confidence level",
+        options = [0.90, 0.95, 0.99],
+        value = 0.95,
+        format_func = lambda c: f"{c:.0%}",
+        key = "cha_conf",
+    )
+
+    if not chosen:
+        st.warning("Pick at least one period to see the results.")
+        return
+
+    by_period = results_by_period(returns, y_name, regressors, chosen, 1 - confidence)   # 95% confidence -> alpha 0.05
+
+    st.caption(f"Confidence intervals at the {confidence:.0%} level")
     st.dataframe(by_period.round(3), width="stretch")
