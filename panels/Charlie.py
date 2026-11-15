@@ -126,6 +126,47 @@ def make_scatter(returns, y_name, regressors, periods, alpha_level=0.05):
     return fig
 
 
+def make_dot_whisker(by_period, regressors, confidence):
+    """
+    Each beta as a dot with its confidence interval, one colour per period.
+    Dashed lines at 0 (no link) and 1 (one-for-one with gold).
+    """
+    fig = go.Figure()
+    for label in PERIODS:
+        rows = by_period[by_period["Period"] == label]
+        if rows.empty:
+            continue
+
+        fig.add_trace(go.Scatter(
+            x = rows["Beta"],
+            y = rows["Regressor"],
+            mode = "markers",
+            orientation = "h",
+            name = label,
+            marker = dict(size = 12, color = PERIOD_COLOURS[label]),
+            error_x = dict(
+                type = "data",
+                symmetric = False,
+                array = rows["CI high"] - rows["Beta"],
+                arrayminus = rows["Beta"] - rows["CI low"],
+                thickness = 2,
+                width = 6,
+            ),
+        ))
+
+    fig.add_vline(x = 0, line_dash = "dot", line_color = "grey",
+                  annotation_text = "β = 0", annotation_position = "top")
+    fig.add_vline(x = 1, line_dash = "dash", line_color = "grey",
+                  annotation_text = "β = 1", annotation_position = "top")
+    fig.update_layout(
+        height = 150 + 80 * len(regressors),
+        xaxis_title = f"Beta with {confidence:.0%} confidence interval",
+        scattermode = "group",
+        margin = dict(l=80, r=10, t=40, b=50),
+    )
+    return fig
+
+
 def render():
     """
     Draw my panel inside the dashboard.
@@ -162,6 +203,16 @@ def render():
 
     by_period = results_by_period(returns, y_name, regressors, chosen, 1 - confidence)   # 95% confidence -> alpha 0.05
 
-    st.plotly_chart(make_scatter(returns, y_name, regressors, chosen, 1 - confidence))
+    view = st.radio(
+        "Chart",
+        options = ["Scatter", "Dot and whisker"],
+        horizontal = True,
+        key = "cha_view",
+    )
+    if view == "Scatter":
+        st.plotly_chart(make_scatter(returns, y_name, regressors, chosen, 1 - confidence))
+    else:
+        st.plotly_chart(make_dot_whisker(by_period, regressors, confidence))
+
     st.caption(f"Confidence intervals at the {confidence:.0%} level")
     st.dataframe(by_period.round(3), hide_index = True, width = "stretch")
