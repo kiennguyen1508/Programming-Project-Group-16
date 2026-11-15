@@ -50,7 +50,7 @@ def run_ols(y, x, alpha_level=0.05):
 
 def results_by_period(returns, y_name, regressors, periods, alpha_level=0.05):
     """
-    Run the regression for each chosen period and return one row of results per period.
+    Run the regression for each chosen period and return one row per period and regressor.
     """
     rows = []
     for label in PERIODS:
@@ -60,18 +60,22 @@ def results_by_period(returns, y_name, regressors, periods, alpha_level=0.05):
         data = returns.loc[start:end]
         beta_hat, se, t_crit, r2, n = run_ols(data[y_name], data[regressors], alpha_level)
 
-        gold_beta, gold_se = beta_hat[1], se[1]
-        rows.append({
-            "Period": label,
-            "Beta (gold)": gold_beta,
-            "Std. Error": gold_se,
-            "CI low": gold_beta - t_crit * gold_se,
-            "CI high": gold_beta + t_crit * gold_se,
-            "t (β=1)": (gold_beta - 1) / gold_se,
-            "R²": r2,
-            "n": n,
-        })
-    return pd.DataFrame(rows).set_index("Period")
+        for i in range(len(regressors)):
+            name = regressors[i]
+            b = beta_hat[i + 1]         # +1 skips the intercept
+            s = se[i + 1]               # +1 skips the intercept
+            rows.append({
+                "Period": label,
+                "Regressor": name,
+                "Beta": b,
+                "Std. Error": s,
+                "CI low": b - t_crit * s,
+                "CI high": b + t_crit * s,
+                "t (β=1)": (b - 1) / s,
+                "R²": r2,
+                "n": n,
+            })
+    return pd.DataFrame(rows)
 
 
 def render():
@@ -111,4 +115,4 @@ def render():
     by_period = results_by_period(returns, y_name, regressors, chosen, 1 - confidence)   # 95% confidence -> alpha 0.05
 
     st.caption(f"Confidence intervals at the {confidence:.0%} level")
-    st.dataframe(by_period.round(3), width="stretch")
+    st.dataframe(by_period.round(3), hide_index = True, width = "stretch")
