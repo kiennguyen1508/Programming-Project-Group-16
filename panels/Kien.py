@@ -16,7 +16,7 @@ RATIOS = {
     "Gold / Copper" : ("Gold", "Copper"),
 }
 TRADING_DAYS = 252 #trading days in a year, used to annualise
-RISK_FREE_RATE = 0.04 # assumed yearly cash return, used in the Sharpe ratio
+RISK_FREE_RATE = 0.04 # assumed yearly cash return, used in the Sharpe ratio and Sortino ratios
 
 METHOD_NOTES = """
 **Data.** Daily closing prices from Yahoo Finance ('yfinance'): gold futures (GC=F),
@@ -25,13 +25,14 @@ Only days when all four traded are kept.
 
 **Rebasing.** Each price is divided by its first value in the period and multiplied by 100.
 
-**Returns and risk.** Daily log returns. Annualised return = (1+total return)^(1/years) -1,
-with years = trading days ÷ 252. Volatility = standard deviation of daily returns × √252.
-Max drawdown = the largest fall from a previous peak within the period.
-Sharpe ratio = (annualised return - risk-free rate) ÷ volatility, using the rate set with the slider (default 4%).
-Copper is COMEX copper futures (HG=F, $ per pound) from the shared macro file. The Gold/Copper ratio compares a safe-haven asset with an industrial one: it tends to rise when markets fear a slowdown and fall when they expect growth.
+**Returns and risk.** Daily simple returns. Annualised return = (1+total return)^(1/years)-1, with years = trading days ÷ 252.
+Volatility = standard deviation of daily returns x √252. Max drawdown = the largest fall from a previous peak within the period. Sharpe ratio = (average
+daily return x 252 - risk-free rate) ÷ volatility, using the slider rate (default 4%). It uses the average return, not the compound one, because compounding already lowers the return of volatile assets.
+Sortino ratio = the same numerator ÷ downside deviation, which only counts days when the return fell below the daily risk-free rate.
 
 **Ratios.** The mean and ±1σ/±2σ bands use the full 2015-2026 history, so they stay fixed when the period changes. The percentile is the share of days since 2015 with a lower ratio than today.
+
+Copper is COMEX copper futures (HG=F, $ per pound) from the shared macro file. The Gold/Copper ratio compares a safe-haven asset with an industrial one: it tends to rise when markets fear a slowdown and fall when they expect growth.
 
 **Limitations.** Futures prices jump slightly when contracts roll over. The S&P 500 is a price index, so it excludes dividends. The ratios are skewed (they can spike far upwards but 
 not fall below zero), so the σ bands are only approximate; the percentile is more reliable. Past performance does not predict future returns. The reversion test uses the mean and σ of the whole sample, which includes the future (look-ahead bias), and consecutive extreme days overlap, so the real number of independent cases is smaller than "Days" suggests.
@@ -82,7 +83,7 @@ def render():
         rebased = chosen / chosen.iloc[0] * 100
         st.plotly_chart(make_price_chart(rebased , log_scale))
         rf = st.slider(
-            "Risk-free rate (%) used in the Sharpe ratio",
+            "Risk-free rate (%) used in the Sharpe and Sortino ratios",
             min_value=0.0 , max_value=6.0 , value=RISK_FREE_RATE * 100, step=0.25,key="p1_rf", 
         ) / 100
         stats = performance_stats(chosen,rf)
@@ -97,6 +98,7 @@ def render():
                 "Volatility (ann.)": "{:.1%}",
                 "Max drawdown": "{:.1%}",
                 "Sharpe ratio": "{:.2f}",
+                "Sortino ratio":"{:.2f}"
             })
         )
 
@@ -258,20 +260,25 @@ def performance_stats(prices, risk_free = RISK_FREE_RATE):
     """
     Return, risk and risk-adjusted return for each asset over the period.
     """
-    returns = np.log(prices).diff().dropna()
+    returns = prices.pct_change().dropna()
     years = len(returns) / TRADING_DAYS
     total = prices.iloc[-1] / prices.iloc[0] - 1
-    annual = (1 + total) ** (1 / years) - 1
+    annual = (1 + total) ** (1 / years) -1          # compound growth, shown in the table
+    mean_annual = returns.mean() * TRADING_DAYS     # average return, used in Sharpe/Sortino
     vol = returns.std() * np.sqrt(TRADING_DAYS)
-    drawdown = (prices / prices.cummax() -1).min()
+    daily_rf = risk_free / TRADING_DAYS
+    shortfall = (returns - daily_rf).clip(upper=0) #only days below the risk-free rate
+    downside_vol = np.sqrt((shortfall**2).mean()) * np.sqrt(TRADING_DAYS)
+    drawdown = (prices / prices.cummax() - 1).min()
     return pd.DataFrame({
         "Total return" : total,
         "Annualised return" : annual,
-        "Volatility (ann.)": vol,
+        "Volatility (ann.)" : vol,
         "Max drawdown" : drawdown,
-        "Sharpe ratio" : (annual - risk_free) / vol,
+        "Sharpe ratio" : (mean_annual - risk_free) / vol,
+        "Sortino ratio" : (mean_annual - risk_free) / downside_vol,
     }).rename_axis("Asset")
-
+    
 
 def price_summary(stats):
     """One-sentence takeaway from the performance table."""
