@@ -6,13 +6,14 @@ import plotly.graph_objects as go
 import pandas as pd
 import numpy as np
 
-from data_loader import get_prices, SPLIT
+from data_loader import get_prices, get_macro, SPLIT
 
 
 COLOURS = {"Gold": "#B45309", "Silver": "#7C8798", "Oil": "#0F766E", "S&P 500": "#2563EB"}
 RATIOS = {
     "Gold / Silver" : ("Gold", "Silver"),
     "Gold / Oil" : ("Gold" , "Oil"),
+    "Gold / Copper" : ("Gold", "Copper"),
 }
 TRADING_DAYS = 252 #trading days in a year, used to annualise
 RISK_FREE_RATE = 0.04 # assumed yearly cash return, used in the Sharpe ratio
@@ -28,6 +29,7 @@ Only days when all four traded are kept.
 with years = trading days ÷ 252. Volatility = standard deviation of daily returns × √252.
 Max drawdown = the largest fall from a previous peak within the period.
 Sharpe ratio = (annualised return - risk-free rate) ÷ volatility, using the rate set with the slider (default 4%).
+Copper is COMEX copper futures (HG=F, $ per pound) from the shared macro file. The Gold/Copper ratio compares a safe-haven asset with an industrial one: it tends to rise when markets fear a slowdown and fall when they expect growth.
 
 **Ratios.** The mean and ±1σ/±2σ bands use the full 2015-2026 history, so they stay fixed when the period changes. The percentile is the share of days since 2015 with a lower ratio than today.
 
@@ -41,7 +43,8 @@ def load_prices():
     """
     Load the shared price data once, then reuse it on every rerun.
     """
-    return get_prices()
+    prices = get_prices()
+    return prices.join(get_macro()["Copper"], how="left")
 
 def render():
     """
@@ -100,8 +103,8 @@ def render():
     else:
         name = st.radio("Ratio" , list(RATIOS) , horizontal = True , key = "p1_ratio")
         top, bottom = RATIOS[name]
-        ratio = recent[top] / recent[bottom]
-        full = prices[top] / prices[bottom]
+        ratio = (recent[top] / recent[bottom]).dropna()
+        full = (prices[top] / prices[bottom]).dropna()
         stats = ratio_stats(full)
         st.plotly_chart(make_ratio_chart(ratio, name, stats["mean"], stats["std"]))
 
