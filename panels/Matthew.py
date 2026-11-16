@@ -34,6 +34,14 @@ def make_heatmap(r_table: pd.DataFrame, title: str):
     fig = px.imshow(r_table.round(2), text_auto=True, color_continuous_scale="RdBu_r", zmin=-1, zmax=1, title = title, )
     return fig 
 
+def hide_cells(r_table: pd.DataFrame, p_table: pd.DataFrame, cutoff: float = 0.05):
+    """Blank out the repeated half, and other non statisitically significant cells."""
+    top_half = np.triu(np.ones(r_table.shape, dtype=bool))
+    not_significant = p_table.values >= cutoff
+    hidden = r_table.mask(top_half | not_significant)
+    return hidden.iloc[1:,:-1]
+
+
 def render():
     """Draw Panel 3 on the dashboard"""
     st.subheader("Panel 3: Correlation Heatmap")
@@ -43,7 +51,8 @@ def render():
     r_before, p_before = correlation_table(before)
     r_since, p_since = correlation_table(since)
     left, right = st.columns(2)     # split the space into two side by side boxes
-    left.plotly_chart(make_heatmap(r_before, "2015-2024"))
-    right.plotly_chart(make_heatmap(r_since,"Since Jan 2025"))
+    left.plotly_chart(make_heatmap(hide_cells(r_before, p_before),"2015-2024"))
+    right.plotly_chart(make_heatmap(hide_cells(r_since, p_since),"Since Jan 2025"))
+    st.caption("Blank cells are statistically insignificant.")
 
                         
