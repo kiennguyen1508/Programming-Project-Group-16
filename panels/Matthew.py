@@ -59,28 +59,43 @@ def fisher_z_test(r1: float, n1: int, r2: float, n2: int) -> tuple:
 
 def render():
     """Draw Panel 3 on the dashboard"""
-    st.subheader("Panel 3: Correlation Heatmap")
+    st.subheader("Correlation Heatmap")
     returns = get_returns().join(load_macro(), how="inner").dropna()
+
+    # 1. Controls
     assets = st.multiselect("Assets", list(returns.columns),
                         default=["Gold", "Silver", "Oil", "S&P 500", "Real yield"],
                         key="p3_assets")
+    first, last = returns.index.min().date(), returns.index.max().date()
+    start, end = st.slider("Time Period", min_value=first, max_value=last,
+                           value=(pd.Timestamp(SPLIT).date(), last),
+                           format="MMM YYYY", key="p3_dates")
     cutoff = st.select_slider("Significance level (p-value cutoff)",
-                        options=[0.01, 0.05, 0.10], value=0.05, key="p3_cutoff")
-    if len(assets) < 2:
-        st.warning("Pick at least two assets to compare.")
+                        options=[0.01, 0.05, 0.10, 0.15, 0.20], value=0.05, key="p3_cutoff")
+
+    # 2. Checking the choices make sense.
+    period = returns.loc[str(start):str(end)]
+    if len(assets) < 2 or len(period) < 30:
+        st.warning("Pick at least two assets and a period of at least 30 trading days to compare.")
         return
-    before, since = split_periods(returns, assets)
-    st.write(f"Days before 2025: {len(before)} | since 2025: {len(since)}")
-    r_before, p_before = correlation_table(before)
-    r_since, p_since = correlation_table(since)
-    left, right = st.columns(2)     # split the space into two side by side boxes
-    left.plotly_chart(make_heatmap(hide_cells(r_before, p_before, cutoff),"2015-2024"))
-    right.plotly_chart(make_heatmap(hide_cells(r_since, p_since, cutoff),"Since Jan 2025"))
-    st.caption("Blank cells are statistically insignificant.")
+
+    # 3. Heatmap for the selected period.
+    r_table, p_table = correlation_table(period[assets])
+    title = f"{start:%b %Y} to {end:%b %Y}"
+    st.plotly_chart(make_heatmap(hide_cells(r_table, p_table, cutoff), title))
+    st.caption(f"{len(period)} trading days. Blank cells are not significant (p >= {cutoff}).")
+
+    # 4. Fisher Test: The chosen period vs everything that comes before it.
     a, b = "Gold", "Oil"
-    z, p = fisher_z_test(r_before.loc[a, b], len(before), r_since.loc[a, b], len(since))
+    before = returns[returns.index < pd.Timestamp(start)]
+    if len(before) < 30:
+        st.info("Move the start date later to compare against an earlier period.")
+        return
+    r1, r2 = before[a].corr(before[b]), period[a].corr(period[b])
+    z, p = fisher_z_test(r1, len(before), r2, len(period))
     c1, c2, c3 = st.columns(3)
-    c1.metric(f"{a}-{b} 2015-2024", f"r = {r_before.loc[a, b]:+.2f}")
-    c2.metric(f"{a}-{b} since 2025", f"r = {r_since.loc[a, b]:+.2f}")
-    c3.metric("Fisher z-test", f"z = {z:.2f}", f"p = {p:.3f}", delta_color="off")
+    c1.metric(f"{a}-{b} before {start:%b %Y}", f"r = {r1:+.2f}")
+    c2.metric(f"{a}-{b} in this period", f"r = {r2:+.2f}")
+    c3.metric("Fisher Z-Test", f"z = {z:.2f}", f"p = {p:.3f}", delta_color="off")
+
                         
