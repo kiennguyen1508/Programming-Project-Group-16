@@ -36,10 +36,10 @@ def make_heatmap(r_table: pd.DataFrame, title: str):
 
 def hide_cells(r_table: pd.DataFrame, p_table: pd.DataFrame, cutoff: float = 0.05):
     """Blank out the repeated half, and other non statisitically significant cells."""
-    top_half = np.triu(np.ones(r_table.shape, dtype=bool))
+    bottom_half = np.tril(np.ones(r_table.shape, dtype=bool))
     not_significant = p_table.values >= cutoff
     hidden = r_table.mask(top_half | not_significant)
-    return hidden.iloc[1:,:-1]
+    return hidden.iloc[:-1,1:]
 
 def fisher_z_test(r1: float, n1: int, r2: float, n2: int) -> tuple:
     """Test whether two correlations from separate periods are really different."""
