@@ -53,6 +53,67 @@ def get_returns(start = None , end = None):
     """
     return np.log(get_prices(start , end)).diff().dropna()
 
+# ---------- Extra data: what drives gold (kept separate from prices.csv) ----------
+MACRO_TICKERS = {"Dollar":"DX-Y.NYB" , "Copper":"HG=F" , "Commodities":"DBC"}
+FRED_SERIES = {"Real yield":"DFII10"} # 10-year TIPS yield, in%
+VIX_CSV = DATA_DIR / "VIX_History.csv"
+MACRO_CSV = DATA_DIR / "macro.csv"
+
+def download_macro():
+    """
+    Download the dollar index, copper, a broad commodity ETF and the real yield,
+    add the VIX from the saved CBOE file, and save everything to data/macro.csv.
+    """
+    import io
+    import requests
+    import yfinance as yf
+
+    raw = yf.download(list(MACRO_TICKERS.values()), start=START, end=END,
+                      auto_adjust=True, progress=False)["Close"]
+    macro = raw.rename(columns={v:k for k, v in MACRO_TICKERS.items()})
+
+    for name, code in FRED_SERIES.items():
+        url = f"https://fred.stlouisfed.org/graph/fredgraph.csv?id={code}"
+        response = requests.get(url, timeout=30)
+        response.raise_for_status()
+        fred = pd.read_csv(io.StringIO(response.text), index_col=0,
+                            parse_dates=True, na_values=".")
+        macro[name] = fred.iloc[:, 0]
+
+    vix = pd.read_csv(VIX_CSV, index_col="DATE", parse_dates=True,
+                      date_format="%m/%d/%Y")["CLOSE"]
+    macro["VIX"] = vix
+
+    macro.index.name="Date"
+    macro.round(4).to_csv(MACRO_CSV)
+    print(f"Saved {len(macro)} rows to {MACRO_CSV}")
+    print(macro.isna().sum())
+
+def get_macro(start=None, end=None):
+    """
+    Levels of the extra series: prices for Dollar, Copper and Commodities,
+    % for Real yield, index points for VIX
+    """
+    macro = pd.read_csv(MACRO_CSV, index_col="Date", parse_dates=True)
+    return macro.loc[start:end]
+
+def get_macro_changes(start=None, end=None):
+    """
+    Daily changes: log returns for prices, basis points for the real yield,
+    points for the VIX (yields and VIX are levels, so log returns don't make sense).
+    """
+    macro = get_macro(start,end)
+    changes = pd.DataFrame(index=macro.index)
+    for col in MACRO_TICKERS:
+        changes[col] = np.log(macro[col]).diff()
+    changes["Real yield"] = macro["Real yield"].diff()*100
+    changes["VIX"] = macro["VIX"].diff()
+    return changes
+
 
 if __name__ == "__main__":
-    download()
+    import sys
+    if "macro" in sys.argv:
+        download_macro()
+    else:
+        download()
