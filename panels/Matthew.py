@@ -38,7 +38,7 @@ def hide_cells(r_table: pd.DataFrame, p_table: pd.DataFrame, cutoff: float = 0.0
     """Blank out the repeated half, and other non statisitically significant cells."""
     bottom_half = np.tril(np.ones(r_table.shape, dtype=bool))
     not_significant = p_table.values >= cutoff
-    hidden = r_table.mask(top_half | not_significant)
+    hidden = r_table.mask(bottom_half | not_significant)
     return hidden.iloc[:-1,1:]
 
 def fisher_z_test(r1: float, n1: int, r2: float, n2: int) -> tuple:
