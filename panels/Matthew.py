@@ -20,6 +20,13 @@ def split_periods(returns: pd.DataFrame, assets: list) -> tuple:
 
     return before, after
 
+def load_macro() -> pd.DataFrame:
+    """Load the macro data and turn each column into a daily change."""
+    macro = pd.read_csv("data/macro.csv", index_col="Date", parse_dates=True)
+    changes = macro.pct_change()                          # daily % change of each level
+    changes["Real yield"] = macro["Real yield"].diff()    # yields: change in % points instead
+    return changes
+
 def correlation_table(returns: pd.DataFrame) -> tuple:
     """Return the correlation (r) and p-value for every pair of assets"""
     r_table = returns.corr()              # r for every pair of assets
@@ -53,7 +60,7 @@ def fisher_z_test(r1: float, n1: int, r2: float, n2: int) -> tuple:
 def render():
     """Draw Panel 3 on the dashboard"""
     st.subheader("Panel 3: Correlation Heatmap")
-    returns = get_returns()
+    returns = get_returns().join(load_macro(), how="inner").dropna()
     before, since = split_periods(returns, list(returns.columns))
     st.write(f"Days before 2025: {len(before)} | since 2025: {len(since)}")
     r_before, p_before = correlation_table(before)
