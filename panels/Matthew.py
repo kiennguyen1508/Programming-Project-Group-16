@@ -27,7 +27,12 @@ def correlation_table(returns: pd.DataFrame) -> tuple:
     for a in returns.columns:
         for b in returns.columns:
             p_table.loc[a,b] = stats.pearsonr(returns[a], returns[b]).pvalue
-            return r_table, p_table
+    return r_table, p_table
+
+def make_heatmap(r_table: pd.DataFrame, title: str):
+    """Draw one correlation heatmap: red=move together, blue = move opposite."""
+    fig = px.imshow(r_table.round(2), text_auto=True, color_continuous_scale="RdBu_r", zmin=-1, zmax=1, title = title, )
+    return fig 
 
 def render():
     """Draw Panel 3 on the dashboard"""
@@ -37,9 +42,8 @@ def render():
     st.write(f"Days before 2025: {len(before)} | since 2025: {len(since)}")
     r_before, p_before = correlation_table(before)
     r_since, p_since = correlation_table(since)
-    st.write("Correlation of daily returns, 2015-2024")
-    st.dataframe(r_before.round(2))
-    st.write("Correlation of daily returns, since Jan 2025")
-    st.dataframe(r_since.round(2))
+    left, right = st.columns(2)     # split the space into two side by side boxes
+    left.plotly_chart(make_heatmap(r_before, "2015-2024"))
+    right.plotly_chart(make_heatmap(r_since,"Since Jan 2025"))
 
                         
