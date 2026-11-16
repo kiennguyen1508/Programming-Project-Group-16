@@ -15,7 +15,7 @@ RATIOS = {
     "Gold / Oil" : ("Gold" , "Oil"),
 }
 TRADING_DAYS = 252 #trading days in a year, used to annualise
-RISK_FREE_RATE = 0.04 # assumed early cash return, used in the Sharpe ratio
+RISK_FREE_RATE = 0.04 # assumed yearly cash return, used in the Sharpe ratio
 
 METHOD_NOTES = """
 **Data.** Daily closing prices from Yahoo Finance ('yfinance'): gold futures (GC=F),
@@ -31,8 +31,8 @@ Sharpe ratio = (annualised return - risk-free rate) ÷ volatility, using the rat
 
 **Ratios.** The mean and ±1σ/±2σ bands use the full 2015-2026 history, so they stay fixed when the period changes. The percentile is the share of days since 2015 with a lower ratio than today.
 
-**Limitations.** Futures prices jump slightly when contracts roll over.The S&P 500 is a price index, so it excludes dividends. The ratios are skewed (they can spike far upwards but 
-not fall below zero), so the σ bands are only approximate; the percentile is more reliable. Past performance does not predict future returns. The reversion test uses the mean and σ of the whole sample, which includes the future (look-ahead bias), and consecutive extreme dats overlap, so the real number of independent cases is smaller than "Days" suggests.
+**Limitations.** Futures prices jump slightly when contracts roll over. The S&P 500 is a price index, so it excludes dividends. The ratios are skewed (they can spike far upwards but 
+not fall below zero), so the σ bands are only approximate; the percentile is more reliable. Past performance does not predict future returns. The reversion test uses the mean and σ of the whole sample, which includes the future (look-ahead bias), and consecutive extreme days overlap, so the real number of independent cases is smaller than "Days" suggests.
 """
 
 
@@ -72,7 +72,7 @@ def render():
             key = "p1_assets",
         )
         if not selected:
-            st.warning("Pick at least on asset to see the chart.")
+            st.warning("Pick at least one asset to see the chart.")
             return
         log_scale = st.toggle("Log scale" , key = "p1_log")
         chosen = recent[selected]
@@ -136,8 +136,8 @@ def render():
 
     st.download_button(
         "Download price data (CSV)",
-        data = recent.to_csv().encode("utf=8"),
-        file_name=f"panell_prices_{period.replace('','_').lower()}.csv",
+        data = recent.to_csv().encode("utf-8"),
+        file_name= f"panel1_prices_{period.replace(' ', '_').lower()}.csv",
         mime="text/csv",
         key="p1_download"
     )
@@ -238,7 +238,7 @@ def reversion_test(full, horizon_days):
     rows = {}
     for label, mask, back in [
         ("Above +2σ" , full > mean + 2 * std, future < 0),
-        ("Below  2σ" , full < mean -2 * std , future >0),
+        ("Below -2σ" , full < mean -2 * std , future >0),
     ]:
         moves = future[mask].dropna()
         if moves.empty:
