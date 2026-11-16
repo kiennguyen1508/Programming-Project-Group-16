@@ -41,6 +41,14 @@ def hide_cells(r_table: pd.DataFrame, p_table: pd.DataFrame, cutoff: float = 0.0
     hidden = r_table.mask(top_half | not_significant)
     return hidden.iloc[1:,:-1]
 
+def fisher_z_test(r1: float, n1: int, r2: float, n2: int) -> tuple:
+    """Test whether two correlations from separate periods are really different."""
+    z1, z2 = np.arctanh(r1), np.arctanh(r2)
+    se = np.sqrt(1 / (n1-3) + 1 / (n2 - 3))
+    z =(z1 - z2) / se
+    p = 2 * (1 - stats.norm.cdf(abs(z)))
+    return z, p
+
 
 def render():
     """Draw Panel 3 on the dashboard"""
@@ -54,5 +62,10 @@ def render():
     left.plotly_chart(make_heatmap(hide_cells(r_before, p_before),"2015-2024"))
     right.plotly_chart(make_heatmap(hide_cells(r_since, p_since),"Since Jan 2025"))
     st.caption("Blank cells are statistically insignificant.")
-
+    a, b = "Gold", "Oil"
+    z, p = fisher_z_test(r_before.loc[a, b], len(before), r_since.loc[a, b], len(since))
+    c1, c2, c3 = st.columns(3)
+    c1.metric(f"{a}-{b} 2015-2024", f"r = {r_before.loc[a, b]:+.2f}")
+    c2.metric(f"{a}-{b} since 2025", f"r = {r_since.loc[a, b]:+.2f}")
+    c3.metric("Fisher z-test", f"z = {z:.2f}", f"p = {p:.3f}", delta_color="off")
                         
