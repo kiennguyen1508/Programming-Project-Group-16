@@ -61,13 +61,21 @@ def render():
     """Draw Panel 3 on the dashboard"""
     st.subheader("Panel 3: Correlation Heatmap")
     returns = get_returns().join(load_macro(), how="inner").dropna()
-    before, since = split_periods(returns, list(returns.columns))
+    assets = st.multiselect("Assets", list(returns.columns),
+                        default=["Gold", "Silver", "Oil", "S&P 500", "Real yield"],
+                        key="p3_assets")
+    cutoff = st.select_slider("Significance level (p-value cutoff)",
+                        options=[0.01, 0.05, 0.10], value=0.05, key="p3_cutoff")
+    if len(assets) < 2:
+        st.warning("Pick at least two assets to compare.")
+        return
+    before, since = split_periods(returns, assets)
     st.write(f"Days before 2025: {len(before)} | since 2025: {len(since)}")
     r_before, p_before = correlation_table(before)
     r_since, p_since = correlation_table(since)
     left, right = st.columns(2)     # split the space into two side by side boxes
-    left.plotly_chart(make_heatmap(hide_cells(r_before, p_before),"2015-2024"))
-    right.plotly_chart(make_heatmap(hide_cells(r_since, p_since),"Since Jan 2025"))
+    left.plotly_chart(make_heatmap(hide_cells(r_before, p_before, cutoff),"2015-2024"))
+    right.plotly_chart(make_heatmap(hide_cells(r_since, p_since, cutoff),"Since Jan 2025"))
     st.caption("Blank cells are statistically insignificant.")
     a, b = "Gold", "Oil"
     z, p = fisher_z_test(r_before.loc[a, b], len(before), r_since.loc[a, b], len(since))
