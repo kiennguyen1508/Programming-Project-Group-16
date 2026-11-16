@@ -70,8 +70,9 @@ def render():
     start, end = st.slider("Time Period", min_value=first, max_value=last,
                            value=(pd.Timestamp(SPLIT).date(), last),
                            format="MMM YYYY", key="p3_dates")
-    cutoff = st.select_slider("Significance level (p-value cutoff)",
-                        options=[0.01, 0.05, 0.10, 0.15, 0.20], value=0.05, key="p3_cutoff")
+    cutoff = st.slider("Significance level (p-value cutoff)", min_value=0.01,
+                       max_value=0.20, value=0.05, step=0.01, format="%.2f", key="p3_cutoff")
+                        
 
     # 2. Checking the choices make sense.
     period = returns.loc[str(start):str(end)]
