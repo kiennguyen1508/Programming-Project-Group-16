@@ -17,6 +17,7 @@ RATIOS = {
 }
 TRADING_DAYS = 252 #trading days in a year, used to annualise
 RISK_FREE_RATE = 0.04 # assumed yearly cash return, used in the Sharpe ratio and Sortino ratios
+VIX_STRESS = 25 # VIX level that counts as a stressed market
 
 METHOD_NOTES = """
 **Data.** Daily closing prices from Yahoo Finance ('yfinance'): gold futures (GC=F),
@@ -34,6 +35,10 @@ Sortino ratio = the same numerator ÷ downside deviation, which only counts days
 
 Copper is COMEX copper futures (HG=F, $ per pound) from the shared macro file. The Gold/Copper ratio compares a safe-haven asset with an industrial one: it tends to rise when markets fear a slowdown and fall when they expect growth.
 
+**Calm vs stressed days.** VIX closes from Cboe, via the shared macro file. A day counts as stressed if the VIX closed at or above the chosen level (default 25) on the previous trading day. Yesterday’s VIX is used because today’s VIX rises because stocks are falling today, which would make the comparison circular. Averages from fewer than about 20 days are unreliable.
+
+With few stressed days, one extreme day can dominate the average (e.g. the S&P 500’s +9.5% on 9 April 2025), so compare the average with the median and prefer the Max period for conclusions.
+
 **Limitations.** Futures prices jump slightly when contracts roll over. The S&P 500 is a price index, so it excludes dividends. The ratios are skewed (they can spike far upwards but 
 not fall below zero), so the σ bands are only approximate; the percentile is more reliable. Past performance does not predict future returns. The reversion test uses the mean and σ of the whole sample, which includes the future (look-ahead bias), and consecutive extreme days overlap, so the real number of independent cases is smaller than "Days" suggests.
 """
@@ -46,6 +51,13 @@ def load_prices():
     """
     prices = get_prices()
     return prices.join(get_macro()["Copper"], how="left")
+
+@st.cache_data
+def load_vix():
+    """
+    Daily VIX closes from the shared macro file.
+    """
+    return get_macro()["VIX"].dropna()
 
 def render():
     """
@@ -98,9 +110,27 @@ def render():
                 "Volatility (ann.)": "{:.1%}",
                 "Max drawdown": "{:.1%}",
                 "Sharpe ratio": "{:.2f}",
-                "Sortino ratio":"{:.2f}"
+                "Sortino ratio":"{:.2f}",
             })
         )
+        
+        st.markdown("**How did each asset do when markets were scared?**")
+        threshold = st.slider("VIX level that counts as stressed", 15, 40,
+                        VIX_STRESS, key="p1_vix")
+        measure = st.radio("Measure", ["Average", "Median"], horizontal=True, key="p1_vix_measure",
+                    help="The median ignores a few extreme days; the average includes them.")
+        table, n_stressed, n_calm = regime_returns(
+            chosen, load_vix(), threshold, "mean" if measure == "Average" else "median")
+        st.caption(f"{n_stressed} stressed and {n_calm} calm days in this period. "
+                   f"A day counts as stressed if the VIX closed at or above {threshold} the day before.")
+        if n_stressed == 0:
+            st.warning("No stressed days in this period. Try a lower threshold or a longer period.")
+        else:
+            if min(n_stressed, n_calm) < 20:
+                st.warning("One group has fewer than 20 days, so its result is unreliable.")
+            st.plotly_chart(make_regime_chart(table, measure))
+            st.info(regime_summary(table, measure))
+        
 
     else:
         name = st.radio("Ratio" , list(RATIOS) , horizontal = True , key = "p1_ratio")
@@ -317,3 +347,48 @@ def ratio_summary(name, top, bottom, stats):
             f"{stats['percentile']:.0f}% of days since 2015. A high ratio means "
             f"{bottom.lower()} is cheap relative to {top.lower()}.")
 
+
+def regime_returns(prices, vix, threshold, measure="mean"):
+    """
+    Average daily return of each asset on calm vs stressed days.
+    A day counts as stressed if the VIX closed at or above the threshold the day before.
+    """
+    returns = prices.pct_change().dropna()
+    prev_vix = vix.shift(1).reindex(returns.index)
+    valid = prev_vix.notna()
+    returns, prev_vix = returns[valid], prev_vix[valid]
+    stressed = prev_vix >= threshold
+    table = pd.DataFrame({
+        "Calm days": returns[~stressed].agg(measure),
+        "Stressed days": returns[stressed].agg(measure),
+    })
+    return table, int(stressed.sum()),int((~stressed).sum())
+
+def make_regime_chart(table, measure):
+    """
+    Grouped bars: each asset's average daily return on calm vs stressed days.
+    """
+    fig = go.Figure()
+    for col, colour in [("Calm days","#94A3B8"),("Stressed days","#DC2626")]:
+        fig.add_trace(go.Bar(
+            x=table.index, y=table[col] * 100, name=col,
+            marker_color=colour, hovertemplate="%{y:.2f}%",
+        ))
+    fig.add_hline(y=0, line_color="grey")
+    fig.update_layout(
+        barmode="group", height=320,
+        yaxis_title=f"{measure} daily return (%)",
+        legend = dict(orientation="h", y=1.1),
+        margin=dict(l=10,r=10,t=30,b=10),
+    )
+    return fig
+
+def regime_summary(table, measure):
+    """
+    One-sentence takeaway from the calm vs stressed comparison.
+    """
+    best = table["Stressed days"].idxmax()
+    worst = table["Stressed days"].idxmin()
+    return (f"On stressed days, **{best}** had the highest {measure.lower()} return "
+        f"({table.loc[best, 'Stressed days']:+.2%} a day) and **{worst}** the lowest "
+        f"({table.loc[worst, 'Stressed days']:+.2%}).")
