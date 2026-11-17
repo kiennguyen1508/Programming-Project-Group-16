@@ -18,6 +18,8 @@ RATIOS = {
 TRADING_DAYS = 252 #trading days in a year, used to annualise
 RISK_FREE_RATE = 0.04 # assumed yearly cash return, used in the Sharpe ratio and Sortino ratios
 VIX_STRESS = 25 # VIX level that counts as a stressed market
+REVERSION_WINDOW = 1260 # 5 years of trading days for the rolling mean and σ
+MIN_HISTORY = 504 # need at least 2 years of history before testing 
 
 METHOD_NOTES = """
 **Data.** Daily closing prices from Yahoo Finance ('yfinance'): gold futures (GC=F),
@@ -31,7 +33,7 @@ Volatility = standard deviation of daily returns x √252. Max drawdown = the la
 daily return x 252 - risk-free rate) ÷ volatility, using the slider rate (default 4%). It uses the average return, not the compound one, because compounding already lowers the return of volatile assets.
 Sortino ratio = the same numerator ÷ downside deviation, which only counts days when the return fell below the daily risk-free rate.
 
-**Ratios.** The mean and ±1σ/±2σ bands use the full 2015-2026 history, so they stay fixed when the period changes. The percentile is the share of days since 2015 with a lower ratio than today.
+**Ratios.** The mean and ±1σ/±2σ bands use the full 2015-2026 history, so they stay fixed when the period changes. The percentile is the share of days since 2015 with a lower ratio than today. The reversion test instead uses a rolling 5-year mean and σ(needing at least 2 years of history), so each day is judged only on data available at the time.
 
 Copper is COMEX copper futures (HG=F, $ per pound) from the shared macro file. The Gold/Copper ratio compares a safe-haven asset with an industrial one: it tends to rise when markets fear a slowdown and fall when they expect growth.
 
@@ -40,7 +42,7 @@ Copper is COMEX copper futures (HG=F, $ per pound) from the shared macro file. T
 With few stressed days, one extreme day can dominate the average (e.g. the S&P 500’s +9.5% on 9 April 2025), so compare the average with the median and prefer the Max period for conclusions.
 
 **Limitations.** Futures prices jump slightly when contracts roll over. The S&P 500 is a price index, so it excludes dividends. The ratios are skewed (they can spike far upwards but 
-not fall below zero), so the σ bands are only approximate; the percentile is more reliable. Past performance does not predict future returns. The reversion test uses the mean and σ of the whole sample, which includes the future (look-ahead bias), and consecutive extreme days overlap, so the real number of independent cases is smaller than "Days" suggests.
+not fall below zero), so the σ bands are only approximate; the percentile is more reliable. Past performance does not predict future returns. Consecutive extreme days overlap, so the real number of independent cases is smaller than "Days" suggests.
 """
 
 
@@ -159,13 +161,16 @@ def render():
         )
         test = reversion_test(full, horizon)
         if test.empty:
-            st.caption("The ratio has never been beyond ±2σ, so there is nothing to test.")
+            st.caption("The ratio has never been beyond ±2σ of its rolling 5-year man, so there is nothing to test.")
         else:
             st.dataframe(test.style.format({
                 "Days" : "{:.0f}",
                 "Average change" : "{:+.1%}",
                 "Moved back towards mean" : "{:.0%}",
+                "Base rate":"{:.0%}",
             }))
+            st.caption("Base rate: how often the ratio moved the same way over the same horizon on any day. "
+                        "The signal only adds information if 'Moved back towards mean' is clearly higher.")
 
 
     with st.expander("Method and Limitations"):
@@ -292,22 +297,26 @@ def ratio_stats(full):
 
 def reversion_test(full, horizon_days):
     """
-    What happened to the ratio after it was more than 2σ from its mean?
+    What happened to the ratio after it was more than 2σ from its rolling 5-year mean?
+    Each day uses only data available at the time, so there is no look-ahead bias
     """
-    mean, std = full.mean(), full.std()
+    rolling = full.rolling(REVERSION_WINDOW, min_periods=MIN_HISTORY)
+    mean, std = rolling.mean(), rolling.std()
     future = full.shift(-horizon_days) / full - 1 # % change over the next N days
+    usable = mean.notna() & future.notna()
     rows = {}
     for label, mask, back in [
         ("Above +2σ" , full > mean + 2 * std, future < 0),
         ("Below -2σ" , full < mean -2 * std , future >0),
     ]:
-        moves = future[mask].dropna()
+        moves = future[mask & usable]
         if moves.empty:
             continue
         rows[label] = {
             "Days" : len(moves),
             "Average change" : moves.mean(),
             "Moved back towards mean" : back[moves.index].mean(),
+            "Base rate": back[usable].mean()
         }
     return pd.DataFrame(rows).T
 
