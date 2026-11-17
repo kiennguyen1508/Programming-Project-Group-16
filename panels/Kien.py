@@ -94,6 +94,8 @@ def render():
         chosen = recent[selected]
         rebased = chosen / chosen.iloc[0] * 100
         st.plotly_chart(make_price_chart(rebased , log_scale))
+        st.markdown("**Drawdown: how far below its previous peak**")
+        st.plotly_chart(make_drawdown_chart(chosen))
         rf = st.slider(
             "Risk-free rate (%) used in the Sharpe and Sortino ratios",
             min_value=0.0 , max_value=6.0 , value=RISK_FREE_RATE * 100, step=0.25,key="p1_rf", 
@@ -217,6 +219,30 @@ def make_price_chart(rebased, log_scale = False):
     )
     if log_scale:
         fig.update_yaxes(type = "log")
+    return fig
+
+def make_drawdown_chart(prices):
+    """
+    How far each asset is below its previous peak on each day (0% = at a new high).
+    """
+    drawdown = (prices / prices.cummax() - 1) * 100
+    fig = go.Figure()
+    for asset in drawdown.columns:
+        fig.add_trace(go.Scatter(
+            x=drawdown.index,
+            y=drawdown[asset],
+            name=asset,
+            mode="lines",
+            line=dict(color=COLOURS[asset],width=1.5),
+            hovertemplate="%{y:.1f}%",
+        ))
+    fig.update_layout(
+        height=260,
+        hovermode="x unified",
+        yaxis_title="Below previous peak (%)",
+        showlegend=False,
+        margin=dict(l=10,r=10,t=30,b=10),
+    )
     return fig
 
 def make_ratio_chart(ratio, name, mean, std):
@@ -392,3 +418,4 @@ def regime_summary(table, measure):
     return (f"On stressed days, **{best}** had the highest {measure.lower()} return "
         f"({table.loc[best, 'Stressed days']:+.2%} a day) and **{worst}** the lowest "
         f"({table.loc[worst, 'Stressed days']:+.2%}).")
+    
