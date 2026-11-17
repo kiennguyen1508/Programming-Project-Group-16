@@ -56,6 +56,15 @@ def fisher_z_test(r1: float, n1: int, r2: float, n2: int) -> tuple:
     p = 2 * (1 - stats.norm.cdf(abs(z)))
     return z, p
 
+def make_rolling_chart(returns: pd.DataFrame, a: str, b: str, window: int, start):
+    """Line chart of the correlation between a and b, calculated over a sliding window period"""
+    rolling = returns[a].rolling(window).corr(returns[b]).dropna()
+    fig = go.Figure(go.Scatter(x=rolling.index, y=rolling, mode="lines", name=f"{a}-{b}"))
+    fig.add_hline(y=0, line_dash="dash", line_color="grey")
+    fig.add_vline(x=pd.Timestamp(start), line_dash="dot", line_color="orange")
+    fig.update_layout(title=f"{a}-{b}: {window}-day rolling correlation",
+                      yaxis_title="Correlation (r)", yaxis_range=[-1,1])
+    return fig
 
 def render():
     """Draw Panel 3 on the dashboard"""
@@ -63,6 +72,7 @@ def render():
     returns = get_returns().join(load_macro(), how="inner").dropna()
 
     # 1. Controls
+    view = st.radio("View", ["Heatmap", "Rolling"], horizontal=True, key="p3_view")
     assets = st.multiselect("Assets", list(returns.columns),
                         default=["Gold", "Silver", "Oil", "S&P 500", "Real yield"],
                         key="p3_assets")
@@ -72,28 +82,35 @@ def render():
                            format="MMM YYYY", key="p3_dates")
     cutoff = st.slider("Significance level (p-value cutoff)", min_value=0.01,
                        max_value=0.20, value=0.05, step=0.01, format="%.2f", key="p3_cutoff")
+    pick1, pick2 = st.columns(2)
+    a = pick1.selectbox("Compare", assets, index=0, key="p3_pair_a")
+    b = pick2.selectbox("with", assets, index=min(2, len(assets) - 1), key="p3_pair_b")
+
                         
 
     # 2. Checking the choices make sense.
     period = returns.loc[str(start):str(end)]
     if len(assets) < 2 or len(period) < 30:
-        st.warning("Pick at least two assets and a period of at least 30 trading days to compare.")
+        st.warning("Please pick at least two assets and a period of at least 30 trading days to compare.")
         return
 
     # 3. Heatmap for the selected period.
-    r_table, p_table = correlation_table(period[assets])
-    title = f"{start:%b %Y} to {end:%b %Y}"
-    st.plotly_chart(make_heatmap(hide_cells(r_table, p_table, cutoff), title))
-    st.caption(f"{len(period)} trading days. Blank cells are not significant (p >= {cutoff}).")
+    if view == "Heatmap":
+        r_table, p_table = correlation_table(period[assets])
+        title = f"{start:%b %Y} to {end:%b %Y}"
+        st.plotly_chart(make_heatmap(hide_cells(r_table, p_table, cutoff), title))
+        st.caption(f"{len(period)} trading days. Blank cells are not significant (p >= {cutoff}).")
+    else:
+        window = st.slider("Rolling Window (trading days)", min_value=30, max_value=250,
+                           value=90, step=10, key="p3_window")
+        st.plotly_chart(make_rolling_chart(returns, a, b, window, start))
+        st.caption(f"Each point is the {a}-{b} correlation over the previous {window} trading days."
+                   f"The dotted line marks the start of your chosen period.")
 
     # 4. Fisher Test: The chosen period vs everything that comes before it.
-    pick1, pick2 = st.columns(2)        # two dropdowns side by side to compare (fisher test)
-    a = pick1.selectbox("Compare", assets, index=0, key="p3_pair_a")
-    b = pick2.selectbox("with", assets, index=min(2, len(assets) - 1), key="p3_pair_b")
     if a == b:
         st.info("Please select two different assets to run the Fisher Test.")
         return
-
     before = returns[returns.index < pd.Timestamp(start)]
     if len(before) < 30:
         st.info("Move the start date later to compare against an earlier period.")
