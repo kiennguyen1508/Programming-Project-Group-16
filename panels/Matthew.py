@@ -87,7 +87,13 @@ def render():
     st.caption(f"{len(period)} trading days. Blank cells are not significant (p >= {cutoff}).")
 
     # 4. Fisher Test: The chosen period vs everything that comes before it.
-    a, b = "Gold", "Oil"
+    pick1, pick2 = st.columns(2)        # two dropdowns side by side to compare (fisher test)
+    a = pick1.selectbox("Compare", assets, index=0, key="p3_pair_a")
+    b = pick2.selectbox("with", assets, index=min(2, len(assets) - 1), key="p3_pair_b")
+    if a == b:
+        st.info("Please select two different assets to run the Fisher Test.")
+        return
+
     before = returns[returns.index < pd.Timestamp(start)]
     if len(before) < 30:
         st.info("Move the start date later to compare against an earlier period.")
