@@ -133,4 +133,15 @@ def render():
     c2.metric(f"{a}-{b} in this period", f"r = {r2:+.2f}")
     c3.metric("Fisher Z-Test", f"z = {z:.2f}", f"p = {p:.3f}", delta_color="off")
     st.info(result_sentence(a, b, r1, r2, p, cutoff, start))
-                        
+
+    # 5. Method and Limitations Dropdown box (if needed?, not sure yet but as a test will add.)
+    with st.expander("Method and Limitations"):
+        st.markdown("""
+This panel compares the daily returns of gold, silver, oil, the S&P 500
+and other key macro measure since 2015. Each cell shows the Pearson correlation
+for the chosen period, and cells that could be down to chance (with p-values
+above the cutoff that you select from 0.01 to 0.20 (for now)) are hidden.
+Correlation is not causation, and short periods give less reliable results etc etc.
+This is just a test paragraph for now, I'm not sure if this is necessary. 
+More detail can be added later if we decide.
+""")
