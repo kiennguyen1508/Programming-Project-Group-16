@@ -66,6 +66,17 @@ def make_rolling_chart(returns: pd.DataFrame, a: str, b: str, window: int, start
                       yaxis_title="Correlation (r)", yaxis_range=[-1,1])
     return fig
 
+def result_sentence(a, b, r1, r2, p, cutoff, start) -> str:
+    """Write a plain-english summary of the Fisher Test result."""
+    direction = "flipped" if np.sign(r1) != np.sign(r2) else "moved"
+    p_text = "p < 0.001" if p < 0.001 else f"p = {p:.3f}"
+    if p < cutoff:
+        verdict = f"this change is statistically significant ({p_text})"
+    else:
+        verdict = f"this change could be chance ({p_text}), so there is no clear sign they decoupled"
+        return (f"**Result:** The {a}-{b} correlation {direction} from {r1:+.2f} before ")
+        f"{start:%b %Y} to {r2:+.2f} in this period; {verdict}."
+
 def render():
     """Draw Panel 3 on the dashboard"""
     st.subheader("Correlation Heatmap")
@@ -121,5 +132,5 @@ def render():
     c1.metric(f"{a}-{b} before {start:%b %Y}", f"r = {r1:+.2f}")
     c2.metric(f"{a}-{b} in this period", f"r = {r2:+.2f}")
     c3.metric("Fisher Z-Test", f"z = {z:.2f}", f"p = {p:.3f}", delta_color="off")
-
+    st.info(result_sentence(a, b, r1, r2, p, cutoff, start))
                         
