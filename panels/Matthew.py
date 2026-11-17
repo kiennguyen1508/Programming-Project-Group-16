@@ -66,6 +66,22 @@ def make_rolling_chart(returns: pd.DataFrame, a: str, b: str, window: int, start
                       yaxis_title="Correlation (r)", yaxis_range=[-1,1])
     return fig
 
+def make_animated_heatmap(returns: pd.DataFrame, assets: list, cutoff: float):
+    """One heatmap per calendar year, plays like a slidehow."""
+    years = sorted(returns.index.year.unique())
+    frames = []
+    for year in years:
+        r_table, p_table = correlation_table(returns.loc[str(year), assets])
+        frames.append(hide_cells(r_table,p_table, cutoff).round(2))
+    fig = px.imshow(np.stack(frames), animation_frame=0, text_auto=True,
+                    x=list(frames[0].columns),
+    y=list(frames[0].index),
+    color_continuous_scale="RdBu_r", zmin=-1, zmax=1)
+    for step, year in zip(fig.layout.sliders[0].steps, years):
+        step.label = str(year)
+        fig.layout.sliders[0].currentvalue.prefix = "Year: "
+        return fig
+
 def result_sentence(a, b, r1, r2, p, cutoff, start) -> str:
     """Write a plain-english summary of the Fisher Test result."""
     direction = "flipped" if np.sign(r1) != np.sign(r2) else "moved"
@@ -83,7 +99,7 @@ def render():
     returns = get_returns().join(load_macro(), how="inner").dropna()
 
     # 1. Controls
-    view = st.radio("View", ["Heatmap", "Rolling"], horizontal=True, key="p3_view")
+    view = st.radio("View", ["Heatmap", "Rolling", "Animated"], horizontal=True, key="p3_view")
     assets = st.multiselect("Assets", list(returns.columns),
                         default=["Gold", "Silver", "Oil", "S&P 500", "Real yield"],
                         key="p3_assets")
@@ -111,6 +127,10 @@ def render():
         title = f"{start:%b %Y} to {end:%b %Y}"
         st.plotly_chart(make_heatmap(hide_cells(r_table, p_table, cutoff), title))
         st.caption(f"{len(period)} trading days. Blank cells are not significant (p >= {cutoff}).")
+    elif view == "Animated":
+        st.plotly_chart(make_animated_heatmap(returns, assets, cutoff))
+        st.caption("Press play to step through each calendar year. This view uses every year, "
+                   "so the time period slider doesn't apply. The year 2026 has only partial data.")
     else:
         window = st.slider("Rolling Window (trading days)", min_value=30, max_value=250,
                            value=90, step=10, key="p3_window")
