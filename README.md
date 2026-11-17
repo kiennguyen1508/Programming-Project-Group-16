@@ -33,3 +33,78 @@ The dashboard opens in your browser at http://localhost:8501.
 If that port is busy, Streamlit uses the next one (8502) and prints the address in the terminal.
 
 No internet connection or API key is needed to run the app. The data is already saved in the `data/` folder.
+
+
+## Data
+
+All data is daily, from 2 January 2015 to 30 October 2026. It comes from Yahoo Finance, FRED (Federal Reserve Bank of St. Louis) and Cboe.
+
+| File | What it contains | Source |
+|---|---|---|
+| `data/prices.csv` | Closing prices of gold futures (`GC=F`), silver futures (`SI=F`), Brent crude futures (`BZ=F`) and the S&P 500 (`^GSPC`). Only days when all four traded are kept. | Yahoo Finance |
+| `data/macro.csv` | US dollar index (`DX-Y.NYB`), copper futures (`HG=F`), a broad commodity ETF (`DBC`), the 10-year real yield (`DFII10`) and the VIX. Kept separate from the prices so that adding it did not change any panel's existing results. | Yahoo Finance, FRED, Cboe |
+| `data/VIX_History.csv` | Daily VIX history, used to build the VIX column in `macro.csv`. | Cboe |
+
+### Refreshing the data
+
+This is optional and needs an internet connection. It overwrites the CSV files with the latest data.
+
+```bash
+python data_loader.py           # re-downloads prices.csv
+python data_loader.py macro     # re-downloads macro.csv
+```
+
+### Using the data in a panel
+
+Every panel loads its data through `data_loader.py`, so all four panels use the same dates and the same definitions.
+
+| Function | What it returns |
+|---|---|
+| `get_prices()` | Daily closing prices, one column per asset |
+| `get_returns()` | Daily log returns of the four assets |
+| `get_macro()` | Levels of the macro series |
+| `get_macro_changes()` | Daily changes of the macro series: log returns for prices, basis points for the real yield, points for the VIX |
+| `SPLIT` | The date used to split "before" and "since 2025" (`2025-01-01`) 
+
+## Project structure
+
+```
+Programming-Project-Group-16/
+├── app.py                    # puts the four panels on one page
+├── data_loader.py            # downloads, saves and loads the shared data
+├── requirements.txt
+├── data/                     # saved CSV files
+├── panels/
+│   ├── Charlie.py            # regression
+│   ├── Kien.py               # performance and ratios
+│   ├── Matthew.py            # correlation heatmap
+│   └── Michael.py            # distribution and risk
+├── charlie_regression.ipynb  # notebook used while building the regression panel
+└── assets/
+```
+
+## The panels
+Each panel has its own "Method and Limitations" section in the app with the details.
+
+## Charlie's panel
+
+## Kien's panel
+
+## Matthew's panel
+
+## Michael's panel
+
+## Contributions
+
+| Member | Panel | Shared work |
+|---|---|---|
+| Charlie | Silver vs gold regression | write this later |
+| Kien Nguyen | Performance & ratios | write this later |
+| Matthew Herbert | Correlation heatmap | write this later |
+| Michael Gilgunn | Distribution & risk | write this later|
+
+## Limitations
+- Gold, silver, oil and copper are future prices, which jump slightly when contracts roll over.
+- The S&P 500 is a price index, so it does not include dividends.
+- The saved data stops on 30 October 2026. Run the refresh commands above to update it.
+- This project was built for a university module and is not investment advice.
