@@ -80,6 +80,9 @@ def make_animated_heatmap(returns: pd.DataFrame, assets: list, cutoff: float):
     for step, year in zip(fig.layout.sliders[0].steps, years):
         step.label = str(year)
         fig.layout.sliders[0].currentvalue.prefix = "Year: "
+        play = fig.layout.updatemenus[0].buttons[0].args[1]
+        play["frame"]["duration"] = 1500
+        play["transition"]["duration"] = 500
         return fig
 
 def result_sentence(a, b, r1, r2, p, cutoff, start) -> str:
