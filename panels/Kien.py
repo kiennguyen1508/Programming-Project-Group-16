@@ -61,6 +61,46 @@ def load_vix():
     """
     return get_macro()["VIX"].dropna()
 
+def show_ratios(prices, recent):
+    """
+    Ratios tabs: ratio chart, z-score and the reversion test.
+    """
+    name = st.radio("Ratio" , list(RATIOS) , horizontal = True , key = "p1_ratio")
+    top, bottom = RATIOS[name]
+    ratio = (recent[top] / recent[bottom]).dropna()
+    full = (prices[top] / prices[bottom]).dropna()
+    stats = ratio_stats(full)
+    st.plotly_chart(make_ratio_chart(ratio, name, stats["mean"], stats["std"]))
+
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Current ratio" , f"{stats['current']:.1f}")
+    c2.metric("Z-score" , f"{stats['z']:+.2f}σ",
+                help = "How many standard deviations today's ratio is from its 2015-2026 average")
+    c3.metric("Percentile" , f"{stats['percentile']:.0f}%",
+                help = "Share of days since 2015 when the ratio was lower than today")
+    st.info(ratio_summary(name,top,bottom,stats))
+    st.markdown("**Do extreme readings revert?**")
+    horizon = st.select_slider(
+        "Look-ahead horizon",
+        options = [21,63,126],
+        value = 63,
+        format_func=lambda d: f"{d//21} month{'s' if d > 21 else ''}",
+        key = "p1_horizon",
+    )
+    test = reversion_test(full, horizon)
+    if test.empty:
+        st.caption("The ratio has never been beyond ±2σ of its rolling 5-year man, so there is nothing to test.")
+    else:
+        st.dataframe(test.style.format({
+            "Days" : "{:.0f}",
+            "Average change" : "{:+.1%}",
+            "Moved back towards mean" : "{:.0%}",
+            "Base rate":"{:.0%}",
+        }))
+        st.caption("Base rate: how often the ratio moved the same way over the same horizon on any day. "
+                    "The signal only adds information if 'Moved back towards mean' is clearly higher.")
+    
+
 def render():
     """
     Draw Panel 1 inside the dashboard.
@@ -137,40 +177,7 @@ def render():
         
 
     else:
-        name = st.radio("Ratio" , list(RATIOS) , horizontal = True , key = "p1_ratio")
-        top, bottom = RATIOS[name]
-        ratio = (recent[top] / recent[bottom]).dropna()
-        full = (prices[top] / prices[bottom]).dropna()
-        stats = ratio_stats(full)
-        st.plotly_chart(make_ratio_chart(ratio, name, stats["mean"], stats["std"]))
-
-        c1, c2, c3 = st.columns(3)
-        c1.metric("Current ratio" , f"{stats['current']:.1f}")
-        c2.metric("Z-score" , f"{stats['z']:+.2f}σ",
-                  help = "How many standard deviations today's ratio is from its 2015-2026 average")
-        c3.metric("Percentile" , f"{stats['percentile']:.0f}%",
-                  help = "Share of days since 2015 when the ratio was lower than today")
-        st.info(ratio_summary(name,top,bottom,stats))
-        st.markdown("**Do extreme readings revert?**")
-        horizon = st.select_slider(
-            "Look-ahead horizon",
-            options = [21,63,126],
-            value = 63,
-            format_func=lambda d: f"{d//21} month{'s' if d > 21 else ''}",
-            key = "p1_horizon",
-        )
-        test = reversion_test(full, horizon)
-        if test.empty:
-            st.caption("The ratio has never been beyond ±2σ of its rolling 5-year man, so there is nothing to test.")
-        else:
-            st.dataframe(test.style.format({
-                "Days" : "{:.0f}",
-                "Average change" : "{:+.1%}",
-                "Moved back towards mean" : "{:.0%}",
-                "Base rate":"{:.0%}",
-            }))
-            st.caption("Base rate: how often the ratio moved the same way over the same horizon on any day. "
-                        "The signal only adds information if 'Moved back towards mean' is clearly higher.")
+        show_ratios(prices, recent)
 
 
     with st.expander("Method and Limitations"):
