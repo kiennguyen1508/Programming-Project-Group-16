@@ -198,3 +198,59 @@ def prepare_analysis():
     )
 
     return returns
+
+# calculate the joint probability density for gold and the S&P 500
+
+def calculate_kde(data, grid_size=60):
+
+    # get the two daily return columns
+    gold = data["Gold"].to_numpy() * 100
+    sp500 = data["S&P 500"].to_numpy() * 100
+
+    # combine the returns into one array
+    values = np.vstack([gold, sp500])
+
+    # estimate the joint probability density
+    kde = gaussian_kde(values)
+
+    # create a grid of possible return combinations
+    gold_grid = np.linspace(gold.min(), gold.max(), grid_size)
+    sp500_grid = np.linspace(sp500.min(), sp500.max(), grid_size)
+
+    X, Y = np.meshgrid(gold_grid, sp500_grid)
+
+    # calculate density at every point on the grid
+    positions = np.vstack([X.ravel(), Y.ravel()])
+    Z = kde(positions).reshape(X.shape)
+
+    return X, Y, Z
+
+
+def create_3d_surface(data, title):
+
+    X, Y, Z = calculate_kde(data)
+
+    # create the 3D surface
+    figure = go.Figure(
+        data=[
+            go.Surface(
+                x=X,
+                y=Y,
+                z=Z,
+                colorscale="Viridis",
+                colorbar=dict(title="Density")
+            )
+        ]
+    )
+
+    figure.update_layout(
+        title=title,
+        scene=dict(
+            xaxis_title="Gold daily return (%)",
+            yaxis_title="S&P 500 daily return (%)",
+            zaxis_title="Joint probability density"
+        ),
+        height=650
+    )
+
+    return figure
