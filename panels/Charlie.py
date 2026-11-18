@@ -1,5 +1,5 @@
 """
-Panel: Silver vs gold regression (Charlie).
+Panel: Regression analysis of silver, oil and gold (Charlie).
 """
 import streamlit as st
 import numpy as np
@@ -7,7 +7,7 @@ import pandas as pd
 from scipy import stats
 import plotly.graph_objects as go
 
-from data_loader import get_prices, get_returns
+from data_loader import get_prices, get_returns, get_macro_changes
 
 SILVER_PEAK = get_prices("2025-01-01")["Silver"].idxmax()        # silver peak
 
@@ -20,7 +20,7 @@ YEARS = {"2015-2024": ("2015-01-01", "2024-12-31"),
          "2026 YTD": ("2026-01-01", None)}
 
 RELATIONSHIPS = {"Silver vs Gold": ("Silver", ["Gold"]),
-                 "Silver vs Gold + S&P 500": ("Silver", ["Gold", "S&P 500"]),
+                 "Silver vs Gold + Copper": ("Silver", ["Gold", "Copper"]),
                  "Oil vs Gold": ("Oil", ["Gold"])}
 
 PERIOD_COLOURS = {"Before": "#7C8798", "Boom": "#B45309", "Crash": "#2563EB",
@@ -31,7 +31,9 @@ def load_returns():
     """
     Load the shared daily returns once, then reuse them on every rerun.
     """
-    return get_returns()
+    returns = get_returns()
+    copper = get_macro_changes()["Copper"]
+    return returns.join(copper)
 
 
 def run_ols(y, x, alpha_level=0.05, robust=True):
@@ -73,7 +75,7 @@ def results_by_period(returns, y_name, regressors, period_dates, periods, alpha_
         if label not in periods:
             continue
         start, end = period_dates[label]
-        data = returns.loc[start:end]
+        data = returns.loc[start:end, [y_name] + regressors].dropna()
         beta_hat, se, t_crit, r2, n = run_ols(data[y_name], data[regressors], alpha_level, robust)
 
         for i in range(len(regressors)):
@@ -105,7 +107,7 @@ def make_scatter(returns, y_name, regressors, period_dates, periods, alpha_level
         if label not in periods:
             continue
         start, end = period_dates[label]
-        data = returns.loc[start:end] * 100         # returns in %
+        data = returns.loc[start:end, [y_name] + regressors].dropna() * 100         # returns in %
         beta_hat, se, t_crit, r2, n = run_ols(data[y_name], data[regressors], alpha_level)
 
         fig.add_trace(go.Scatter(
@@ -187,7 +189,7 @@ def render():
     """
     Draw my panel inside the dashboard.
     """
-    st.subheader("Silver vs gold regression")
+    st.subheader("Regression analysis: silver, oil and gold")
     st.caption("By Charlie O'Sullivan | Data: Yahoo Finance daily prices")
 
     returns = load_returns()
