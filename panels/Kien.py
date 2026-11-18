@@ -37,7 +37,7 @@ Sortino ratio = the same numerator ÷ downside deviation, which only counts days
 
 Copper is COMEX copper futures (HG=F, $ per pound) from the shared macro file. The Gold/Copper ratio compares a safe-haven asset with an industrial one: it tends to rise when markets fear a slowdown and fall when they expect growth.
 
-**Calm vs stressed days.** VIX closes from Cboe, via the shared macro file. A day counts as stressed if the VIX closed at or above the chosen level (default 25) on the previous trading day. Yesterday’s VIX is used because today’s VIX rises because stocks are falling today, which would make the comparison circular. Averages from fewer than about 20 days are unreliable.
+**Calm vs stressed days.** VIX closes from Cboe, via the shared macro file. A day counts as stressed if the VIX closed at or above the chosen level (default 25) on the previous trading day. Yesterday’s VIX is used because today’s VIX rises because stocks are falling today, which would make the comparison circular. Averages from fewer than about 20 days are unreliable. The chart shows the average daily return. The median gives a similar ranking and is less affected by a few extreme days.
 
 With few stressed days, one extreme day can dominate the average (e.g. the S&P 500’s +9.5% on 9 April 2025), so compare the average with the median and prefer the Max period for conclusions.
 
@@ -110,8 +110,7 @@ def show_stress(chosen):
     st.markdown("**How did each asset do when markets were scared?**")
     threshold = st.slider("VIX level that counts as stressed", 15, 40,
                     VIX_STRESS, key="p1_vix")
-    measure = st.radio("Measure", ["Average", "Median"], horizontal=True, key="p1_vix_measure",
-                help="The median ignores a few extreme days; the average includes them.")
+    measure = "Average"
     table, n_stressed, n_calm = regime_returns(
         chosen, load_vix(), threshold, "mean" if measure == "Average" else "median")
     st.caption(f"{n_stressed} stressed and {n_calm} calm days in this period. "
