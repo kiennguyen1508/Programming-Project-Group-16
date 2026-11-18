@@ -34,9 +34,10 @@ def load_returns():
     return get_returns()
 
 
-def run_ols(y, x, alpha_level=0.05):
+def run_ols(y, x, alpha_level=0.05, robust=True):
     """
-    OLS by matrix formula. Returns beta_hat, se, t_crit, R squared and n.
+    OLS by matrix formula, with White robust or ordinary standard errors.
+    Returns beta_hat, se, t_crit, R squared and n.
     """
     n = len(y)
     Y = y.to_numpy()
@@ -49,8 +50,13 @@ def run_ols(y, x, alpha_level=0.05):
 
     u_hat = Y - X @ beta_hat
     SSR = u_hat @ u_hat
-    sigma_sq_hat = SSR / df
-    se_beta_hat = np.sqrt(np.diag(sigma_sq_hat * X_prime_X_inv))
+    if robust:
+        meat = (X.T * u_hat ** 2) @ X                                           # inner part of White sandwich estimator
+        var_beta_hat = X_prime_X_inv @ meat @ X_prime_X_inv * n / df            # White sandwich estimator
+    else:
+        sigma_sq_hat = SSR / df
+        var_beta_hat = sigma_sq_hat * X_prime_X_inv
+    se_beta_hat = np.sqrt(np.diag(var_beta_hat))
 
     t_crit = stats.t.ppf(1 - alpha_level / 2, df)
     SST = np.sum((Y - np.mean(Y)) ** 2)
@@ -58,7 +64,7 @@ def run_ols(y, x, alpha_level=0.05):
     return beta_hat, se_beta_hat, t_crit, r_squared, n
 
 
-def results_by_period(returns, y_name, regressors, period_dates, periods, alpha_level=0.05):
+def results_by_period(returns, y_name, regressors, period_dates, periods, alpha_level=0.05, robust=True):
     """
     Run the regression for each chosen period and return one row per period and regressor.
     """
@@ -68,7 +74,7 @@ def results_by_period(returns, y_name, regressors, period_dates, periods, alpha_
             continue
         start, end = period_dates[label]
         data = returns.loc[start:end]
-        beta_hat, se, t_crit, r2, n = run_ols(data[y_name], data[regressors], alpha_level)
+        beta_hat, se, t_crit, r2, n = run_ols(data[y_name], data[regressors], alpha_level, robust)
 
         for i in range(len(regressors)):
             name = regressors[i]
@@ -222,11 +228,17 @@ def render():
         key = "cha_conf",
     )
 
+    robust = st.toggle(
+        "Robust standard errors (White)",
+        value = True,
+        key = "cha_robust",
+    )
+
     if not chosen:
         st.warning("Pick at least one period to see the results.")
         return
 
-    by_period = results_by_period(returns, y_name, regressors, period_dates, chosen, 1 - confidence)
+    by_period = results_by_period(returns, y_name, regressors, period_dates, chosen, 1 - confidence, robust)
 
     view = st.radio(
         "Chart",
@@ -239,5 +251,9 @@ def render():
     else:
         st.plotly_chart(make_dot_whisker(by_period, regressors, period_dates, confidence))
 
-    st.caption(f"Confidence intervals at the {confidence:.0%} level")
+    if robust:
+        st.caption(f"Confidence intervals at the {confidence:.0%} level, using White robust standard errors")
+    else:
+        st.caption(f"Confidence intervals at the {confidence:.0%} level, assuming constant error variance")
+
     st.dataframe(by_period.round(3), hide_index = True, width = "stretch")
