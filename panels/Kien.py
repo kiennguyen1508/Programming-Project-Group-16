@@ -131,11 +131,22 @@ def show_performance(chosen):
     if chosen.empty:
         st.warning("Pick at least one asset to see this.")
         return
-    log_scale = st.toggle("Log scale" , key = "p1_log")
-    rebased = chosen / chosen.iloc[0] * 100
-    st.plotly_chart(make_price_chart(rebased , log_scale))
-    st.markdown("**Drawdown: how far below its previous peak**")
-    st.plotly_chart(make_drawdown_chart(chosen))
+    
+    chart_type = st.radio(
+        "Chart",
+        ["Growth of 100","Drawdown"],
+        horizontal = True,
+        key = "p1_chart_type",
+        label_visibility = "collapsed",
+    )
+    if chart_type == "Growth of 100":
+        log_scale = st.toggle("Log scale", key = "p1_log")
+        rebased = chosen / chosen.iloc[0] * 100
+        st.plotly_chart(make_price_chart(rebased, log_scale))
+    else:
+        st.caption("How far each asset is below its previous peak")
+        st.plotly_chart(make_drawdown_chart(chosen))
+
     rf = st.slider(
         "Risk-free rate (%) used in the Sharpe and Sortino ratios",
         min_value=0.0 , max_value=6.0 , value=RISK_FREE_RATE * 100, step=0.25,key="p1_rf", 
@@ -287,7 +298,7 @@ def make_drawdown_chart(prices):
         height=260,
         hovermode="x unified",
         yaxis_title="Below previous peak (%)",
-        showlegend=False,
+        legend = dict(orientation = "h" , y = 1.1),
         margin=dict(l=10,r=10,t=30,b=10),
     )
     return fig
