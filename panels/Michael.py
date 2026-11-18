@@ -146,3 +146,55 @@ def calculate_returns(data):
     returns = returns.join(data[["DFII10", "GVZCLS", "SKEW"]])
 
     return returns.dropna()
+
+# calculate the different market conditions
+
+def add_market_regimes(data):
+
+    data = data.copy()
+
+    # use the median to separate high and low conditions
+    rate_level = data["DFII10"].median()
+    gold_vol_level = data["GVZCLS"].median()
+    skew_level = data["SKEW"].median()
+
+    data["Rate regime"] = np.where(
+        data["DFII10"] >= rate_level,
+        "High real rates",
+        "Low real rates"
+    )
+
+    data["Gold volatility"] = np.where(
+        data["GVZCLS"] >= gold_vol_level,
+        "High gold volatility",
+        "Low gold volatility"
+    )
+
+    data["Equity tail risk"] = np.where(
+        data["SKEW"] >= skew_level,
+        "High equity tail risk",
+        "Low equity tail risk"
+    )
+
+    return data
+
+
+def prepare_analysis():
+
+    # load the combined dataset
+    data = prepare_data()
+
+    # calculate daily returns
+    returns = calculate_returns(data)
+
+    # add the market regime labels
+    returns = add_market_regimes(returns)
+
+    # mark observations before and during 2025
+    returns["Period"] = np.where(
+        returns.index >= SPLIT_DATE,
+        "2025 onwards",
+        "Before 2025"
+    )
+
+    return returns
