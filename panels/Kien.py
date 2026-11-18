@@ -104,6 +104,9 @@ def show_stress(chosen):
     """
     Stress days tab: average daily return on calm vs stressed days.
     """
+    if chosen.empty:
+        st.warning("Pick at least one asset to see this.")
+        return
     st.markdown("**How did each asset do when markets were scared?**")
     threshold = st.slider("VIX level that counts as stressed", 15, 40,
                     VIX_STRESS, key="p1_vix")
@@ -125,6 +128,9 @@ def show_performance(chosen):
     """
     Performance tab: growth chart, drawdown chart, ratio table.
     """
+    if chosen.empty:
+        st.warning("Pick at least one asset to see this.")
+        return
     log_scale = st.toggle("Log scale" , key = "p1_log")
     rebased = chosen / chosen.iloc[0] * 100
     st.plotly_chart(make_price_chart(rebased , log_scale))
@@ -158,7 +164,6 @@ def render():
 
     prices = load_prices()
 
-    view = st.radio("View" , ["Prices" , "Ratios"] , horizontal = True , key = "p1_view")
     period = st.radio(
         "Period",
         ["Since 2025" , "YTD" , "1Y" , "5Y" , "Max"],
@@ -171,25 +176,22 @@ def render():
         f"Daily closes from {recent.index[0].date()} to {recent.index[-1].date()} "
         f"({len(recent)} trading days)"
     )
-    if view == "Prices":
-        selected = st.multiselect(
-            "Assets",
-            options = list(COLOURS),
-            default = list(COLOURS),
-            key = "p1_assets",
-        )
-        if not selected:
-            st.warning("Pick at least one asset to see the chart.")
-            return
-        chosen = recent[selected]
-        
+    
+    selected = st.multiselect(
+        "Assets",
+        options = list(COLOURS),
+        default = list(COLOURS),
+        key = "p1_assets",
+    )
+    chosen = recent[selected]
+
+    tab_perf, tab_stress, tab_ratio = st.tabs(["Performance","Stress days", "Ratios"])
+    with tab_perf:
         show_performance(chosen)
+    with tab_stress:
         show_stress(chosen)
-        
-
-    else:
+    with tab_ratio:
         show_ratios(prices, recent)
-
 
     with st.expander("Method and Limitations"):
         st.markdown(METHOD_NOTES)
