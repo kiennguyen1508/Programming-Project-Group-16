@@ -199,6 +199,15 @@ def render():
             help = "Used in the Performance and Stress days tabs. Ratios has its own picker."
         )
     recent = prices.loc[start_date(prices, period):]
+    start = st.slider(
+        "Start from",
+        min_value = recent.index[0].date(),
+        max_value = recent.index[-21].date(),
+        value = recent.index[0].date(),
+        format = "D MMM YYYY",
+        key = f"p1_start_{period}",
+    )
+    recent = recent.loc[pd.Timestamp(start):]
 
     st.caption(
         f"Daily closes from {recent.index[0].date()} to {recent.index[-1].date()} "
