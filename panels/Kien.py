@@ -133,7 +133,7 @@ def show_performance(chosen):
     
     chart_type = st.radio(
         "Chart",
-        ["Growth of 100","Drawdown"],
+        ["Growth of 100","Drawdown","Replay"],
         horizontal = True,
         key = "p1_chart_type",
         label_visibility = "collapsed",
@@ -142,6 +142,9 @@ def show_performance(chosen):
         log_scale = st.toggle("Log scale", key = "p1_log")
         rebased = chosen / chosen.iloc[0] * 100
         st.plotly_chart(make_price_chart(rebased, log_scale))
+    elif chart_type == "Replay":
+        rebased = chosen / chosen.iloc[0] * 100
+        st.plotly_chart(make_replay_chart(rebased), config={"displayModeBar":False})
     else:
         st.caption("How far each asset is below its previous peak")
         st.plotly_chart(make_drawdown_chart(chosen))
@@ -318,6 +321,54 @@ def make_drawdown_chart(prices):
         margin=dict(l=10,r=10,t=30,b=10),
     )
     return fig
+
+def make_replay_chart(rebased, max_frames = 100):
+    """
+    Growth of 100 that draws itself over time when you press Play.
+    Uses at most max_frames frames so long periods stay fast.
+    """
+    step = max(1, len(rebased) // max_frames)
+    ends = list(range(step, len(rebased), step)) + [len(rebased)]
+
+    def lines_up_to(end):
+        part = rebased.iloc[:end]
+        return [
+            go.Scatter(
+                x = part.index, y = part[asset], name = asset, mode="lines",
+                line = dict(color=COLOURS[asset], width = 1.5),
+            )
+            for asset in rebased.columns
+        ]
+    fig = go.Figure(
+        data = lines_up_to(1),
+        frames = [go.Frame(data=lines_up_to(end)) for end in ends],
+    )
+    fig.add_hline(y=100, line_dash="dot", line_color="grey", line_width=1)
+    fig.update_layout(
+        height=420,
+        yaxis_title="Value (start = 100)",
+        xaxis=dict(range=[rebased.index[0], rebased.index[-1]]),
+        yaxis=dict(range=[rebased.min().min() * 0.95, rebased.max().max() * 1.05]),
+        legend=dict(orientation="h", y=1.1),
+        margin=dict(l=10, r=10, t=30, b=10),
+        updatemenus=[dict(
+            type="buttons", showactive=False,
+            x=1, y=1.15, xanchor="right", direction="left",
+            bgcolor="#1f2430", bordercolor="#444",
+            font=dict(color="white", size=13),
+            buttons=[
+                dict(label="▶ Play", method="animate",
+                     args=[None, dict(frame=dict(duration=50, redraw=False),
+                                      transition=dict(duration=0), fromcurrent=True)]),
+                dict(label="❚❚ Pause", method="animate",
+                     args=[[None], dict(frame=dict(duration=0, redraw=False),
+                                        mode="immediate")]),
+            ],
+        )],
+    )
+    return fig
+
+
 
 def make_ratio_chart(ratio, name, mean, std):
     """
