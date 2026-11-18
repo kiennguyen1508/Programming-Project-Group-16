@@ -98,3 +98,51 @@ def load_extra_data():
     skew = get_skew_data()
 
     return real_rates, gold_volatility, skew
+
+# load the existing prices and join the new data
+
+from data_loader import get_prices
+
+
+@st.cache_data(ttl=3600)
+def prepare_data():
+
+    # get the shared asset prices
+    prices = get_prices()
+
+    # keep gold and the S&P 500
+    prices = prices[["Gold", "S&P 500"]].copy()
+
+    # load the three extra datasets
+    real_rates, gold_volatility, skew = load_extra_data()
+
+    # join everything using the date
+    data = prices.join(real_rates, how="inner")
+    data = data.join(gold_volatility, how="inner")
+    data = data.join(skew, how="inner")
+
+    # keep the period used in the project
+    data = data.loc[START_DATE:]
+
+    # remove any missing observations
+    data = data.dropna()
+
+    # make sure dates are in order
+    data = data.sort_index()
+
+    return data
+
+
+def calculate_returns(data):
+
+    # calculate daily log returns for gold and the S&P
+    returns = data[["Gold", "S&P 500"]].apply(
+        lambda x: np.log(x / x.shift(1))
+    )
+
+    returns = returns.dropna()
+
+    # add the extra market information
+    returns = returns.join(data[["DFII10", "GVZCLS", "SKEW"]])
+
+    return returns.dropna()
