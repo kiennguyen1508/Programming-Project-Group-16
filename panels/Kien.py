@@ -164,12 +164,22 @@ def render():
 
     prices = load_prices()
 
-    period = st.radio(
-        "Period",
-        ["Since 2025" , "YTD" , "1Y" , "5Y" , "Max"],
-        horizontal = True,
-        key = "p1_period",
-    )
+    col_period, col_assets = st.columns([2,3])
+    with col_period:
+        period = st.radio(
+            "Period",
+            ["Since 2025" , "YTD" , "1Y" , "5Y" , "Max"],
+            horizontal = True,
+            key = "p1_period",
+        )
+    with col_assets:
+        selected = st.multiselect(
+            "Assets",
+            options = list(COLOURS),
+            default = list(COLOURS),
+            key = "p1_assets",
+            help = "Used in the Performance and Stress days tabs. Ratios has its own picker."
+        )
     recent = prices.loc[start_date(prices, period):]
 
     st.caption(
@@ -177,12 +187,6 @@ def render():
         f"({len(recent)} trading days)"
     )
     
-    selected = st.multiselect(
-        "Assets",
-        options = list(COLOURS),
-        default = list(COLOURS),
-        key = "p1_assets",
-    )
     chosen = recent[selected]
 
     tab_perf, tab_stress, tab_ratio = st.tabs(["Performance","Stress days", "Ratios"])
