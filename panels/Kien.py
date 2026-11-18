@@ -99,7 +99,27 @@ def show_ratios(prices, recent):
         }))
         st.caption("Base rate: how often the ratio moved the same way over the same horizon on any day. "
                     "The signal only adds information if 'Moved back towards mean' is clearly higher.")
-    
+
+def show_stress(chosen):
+    """
+    Stress days tab: average daily return on calm vs stressed days.
+    """
+    st.markdown("**How did each asset do when markets were scared?**")
+    threshold = st.slider("VIX level that counts as stressed", 15, 40,
+                    VIX_STRESS, key="p1_vix")
+    measure = st.radio("Measure", ["Average", "Median"], horizontal=True, key="p1_vix_measure",
+                help="The median ignores a few extreme days; the average includes them.")
+    table, n_stressed, n_calm = regime_returns(
+        chosen, load_vix(), threshold, "mean" if measure == "Average" else "median")
+    st.caption(f"{n_stressed} stressed and {n_calm} calm days in this period. "
+               f"A day counts as stressed if the VIX closed at or above {threshold} the day before.")
+    if n_stressed == 0:
+        st.warning("No stressed days in this period. Try a lower threshold or a longer period.")
+    else:
+        if min(n_stressed, n_calm) < 20:
+            st.warning("One group has fewer than 20 days, so its result is unreliable.")
+        st.plotly_chart(make_regime_chart(table, measure))
+        st.info(regime_summary(table, measure))
 
 def render():
     """
@@ -158,22 +178,7 @@ def render():
             })
         )
         
-        st.markdown("**How did each asset do when markets were scared?**")
-        threshold = st.slider("VIX level that counts as stressed", 15, 40,
-                        VIX_STRESS, key="p1_vix")
-        measure = st.radio("Measure", ["Average", "Median"], horizontal=True, key="p1_vix_measure",
-                    help="The median ignores a few extreme days; the average includes them.")
-        table, n_stressed, n_calm = regime_returns(
-            chosen, load_vix(), threshold, "mean" if measure == "Average" else "median")
-        st.caption(f"{n_stressed} stressed and {n_calm} calm days in this period. "
-                   f"A day counts as stressed if the VIX closed at or above {threshold} the day before.")
-        if n_stressed == 0:
-            st.warning("No stressed days in this period. Try a lower threshold or a longer period.")
-        else:
-            if min(n_stressed, n_calm) < 20:
-                st.warning("One group has fewer than 20 days, so its result is unreliable.")
-            st.plotly_chart(make_regime_chart(table, measure))
-            st.info(regime_summary(table, measure))
+        show_stress(chosen)
         
 
     else:
