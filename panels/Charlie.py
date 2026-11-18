@@ -185,6 +185,53 @@ def make_dot_whisker(by_period, regressors, period_dates, confidence):
     return fig
 
 
+def make_3d(returns, y_name, regressors, period_dates, label, alpha_level=0.05):
+    """
+    3D view of the multiple regression for one period.
+    Each dot is one trading day, and the flat surface is the fitted regression plane.
+    """
+    start, end = period_dates[label]
+    data = returns.loc[start:end, [y_name] + regressors].dropna() * 100         # returns in %
+    beta_hat, se, t_crit, r2, n = run_ols(data[y_name], data[regressors], alpha_level)
+    x1 = regressors[0]
+    x2 = regressors[1]
+
+    edges_1 = np.array([data[x1].min(), data[x1].max()])
+    edges_2 = np.array([data[x2].min(), data[x2].max()])
+    grid_1, grid_2 = np.meshgrid(edges_1, edges_2)                  # the 4 corners of the plane
+    plane = beta_hat[0] + beta_hat[1] * grid_1 + beta_hat[2] * grid_2
+
+    fig = go.Figure()
+    fig.add_trace(go.Scatter3d(
+        x = data[x1],
+        y = data[x2],
+        z = data[y_name],
+        mode = "markers",
+        name = "Daily returns",
+        marker = dict(size = 2, opacity = 0.5, color = PERIOD_COLOURS[label]),
+    ))
+    fig.add_trace(go.Surface(
+        x = grid_1,
+        y = grid_2,
+        z = plane,
+        name = "Fitted plane",
+        opacity = 0.5,
+        showscale = False,
+        colorscale = [[0, "#E0B252"], [1, "#E0B252"]],
+    ))
+    fig.update_layout(
+        height = 550,
+        title = f"{label}: {y_name} = {beta_hat[0]:.2f} + {beta_hat[1]:.2f} x {x1} + {beta_hat[2]:.2f} x {x2}",
+        scene = dict(
+            xaxis_title = f"{x1} (%)",
+            yaxis_title = f"{x2} (%)",
+            zaxis_title = f"{y_name} (%)",
+        ),
+        margin = dict(l=0, r=0, t=40, b=0),
+    )
+    return fig
+
+
 def render():
     """
     Draw my panel inside the dashboard.
@@ -242,16 +289,28 @@ def render():
 
     by_period = results_by_period(returns, y_name, regressors, period_dates, chosen, 1 - confidence, robust)
 
+    views = ["Scatter", "Dot and whisker"]
+    if len(regressors) == 2:
+        views.append("3D plane")
+
     view = st.radio(
         "Chart",
-        options = ["Scatter", "Dot and whisker"],
+        options = views,
         horizontal = True,
-        key = "cha_view",
+        key = f"cha_view_{len(regressors)}",
     )
     if view == "Scatter":
         st.plotly_chart(make_scatter(returns, y_name, regressors, period_dates, chosen, 1 - confidence))
-    else:
+    elif view == "Dot and whisker":
         st.plotly_chart(make_dot_whisker(by_period, regressors, period_dates, confidence))
+    else:
+        which = st.selectbox(
+            "Period for the 3D view",
+            options = chosen,
+            key = "cha_3d",
+        )
+        st.plotly_chart(make_3d(returns, y_name, regressors, period_dates, which, 1 - confidence))
+        st.caption("Drag to rotate. Each dot is one trading day, and the gold surface is the fitted regression plane.")
 
     if robust:
         st.caption(f"Confidence intervals at the {confidence:.0%} level, using White robust standard errors")
