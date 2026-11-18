@@ -156,15 +156,23 @@ def show_performance(chosen):
         st.caption("This period is shorter than a year, so annualised figures are extrapolated and can look extreme.")
     st.info(price_summary(stats))
     
+    higher_is_better = ["Total return", "Annualised return", "Max drawdown",
+                        "Sharpe ratio", "Sortino ratio"]
+    lower_is_better = ["Volatility (ann.)"]
+    best = "font-weight: bold; color:#E5B85C"
+
     st.dataframe(
-        stats.style.format({
-            "Total return": "{:.1%}",
-            "Annualised return": "{:.1%}",
+        stats.style
+        .format({
+            "Total return" : "{:.1%}",
+             "Annualised return": "{:.1%}",
             "Volatility (ann.)": "{:.1%}",
             "Max drawdown": "{:.1%}",
             "Sharpe ratio": "{:.2f}",
-            "Sortino ratio":"{:.2f}",
+            "Sortino ratio": "{:.2f}",
         })
+        .highlight_max(subset=higher_is_better, props=best)
+        .highlight_min(subset=lower_is_better, props=best)
     )
 
 def render():
