@@ -121,6 +121,35 @@ def show_stress(chosen):
         st.plotly_chart(make_regime_chart(table, measure))
         st.info(regime_summary(table, measure))
 
+def show_performance(chosen):
+    """
+    Performance tab: growth chart, drawdown chart, ratio table.
+    """
+    log_scale = st.toggle("Log scale" , key = "p1_log")
+    rebased = chosen / chosen.iloc[0] * 100
+    st.plotly_chart(make_price_chart(rebased , log_scale))
+    st.markdown("**Drawdown: how far below its previous peak**")
+    st.plotly_chart(make_drawdown_chart(chosen))
+    rf = st.slider(
+        "Risk-free rate (%) used in the Sharpe and Sortino ratios",
+        min_value=0.0 , max_value=6.0 , value=RISK_FREE_RATE * 100, step=0.25,key="p1_rf", 
+    ) / 100
+    stats = performance_stats(chosen,rf)
+    if len(chosen) < TRADING_DAYS:
+        st.caption("This period is shorter than a year, so annualised figures are extrapolated and can look extreme.")
+    st.info(price_summary(stats))
+    
+    st.dataframe(
+        stats.style.format({
+            "Total return": "{:.1%}",
+            "Annualised return": "{:.1%}",
+            "Volatility (ann.)": "{:.1%}",
+            "Max drawdown": "{:.1%}",
+            "Sharpe ratio": "{:.2f}",
+            "Sortino ratio":"{:.2f}",
+        })
+    )
+
 def render():
     """
     Draw Panel 1 inside the dashboard.
@@ -152,32 +181,9 @@ def render():
         if not selected:
             st.warning("Pick at least one asset to see the chart.")
             return
-        log_scale = st.toggle("Log scale" , key = "p1_log")
         chosen = recent[selected]
-        rebased = chosen / chosen.iloc[0] * 100
-        st.plotly_chart(make_price_chart(rebased , log_scale))
-        st.markdown("**Drawdown: how far below its previous peak**")
-        st.plotly_chart(make_drawdown_chart(chosen))
-        rf = st.slider(
-            "Risk-free rate (%) used in the Sharpe and Sortino ratios",
-            min_value=0.0 , max_value=6.0 , value=RISK_FREE_RATE * 100, step=0.25,key="p1_rf", 
-        ) / 100
-        stats = performance_stats(chosen,rf)
-        if len(chosen) < TRADING_DAYS:
-            st.caption("This period is shorter than a year, so annualised figures are extrapolated and can look extreme.")
-        st.info(price_summary(stats))
         
-        st.dataframe(
-            stats.style.format({
-                "Total return": "{:.1%}",
-                "Annualised return": "{:.1%}",
-                "Volatility (ann.)": "{:.1%}",
-                "Max drawdown": "{:.1%}",
-                "Sharpe ratio": "{:.2f}",
-                "Sortino ratio":"{:.2f}",
-            })
-        )
-        
+        show_performance(chosen)
         show_stress(chosen)
         
 
