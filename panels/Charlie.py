@@ -7,17 +7,24 @@ import pandas as pd
 from scipy import stats
 import plotly.graph_objects as go
 
-from data_loader import get_returns
+from data_loader import get_prices, get_returns
 
-PERIODS = {"2015-2024": ("2015-01-01", "2024-12-31"),
-           "2025": ("2025-01-01", "2025-12-31"),
-           "2026": ("2026-01-01", None)}
+SILVER_PEAK = get_prices("2025-01-01")["Silver"].idxmax()        # silver peak
+
+PHASES = {"Before": ("2015-01-01", "2024-12-31"),
+          "Boom": ("2025-01-01", SILVER_PEAK),
+          "Crash": (SILVER_PEAK + pd.Timedelta(days = 1), None)}
+
+YEARS = {"2015-2024": ("2015-01-01", "2024-12-31"),
+         "2025": ("2025-01-01", "2025-12-31"),
+         "2026 YTD": ("2026-01-01", None)}
 
 RELATIONSHIPS = {"Silver vs Gold": ("Silver", ["Gold"]),
                  "Silver vs Gold + S&P 500": ("Silver", ["Gold", "S&P 500"]),
                  "Oil vs Gold": ("Oil", ["Gold"])}
 
-PERIOD_COLOURS = {"2015-2024": "#7C8798", "2025": "#B45309", "2026": "#2563EB"}
+PERIOD_COLOURS = {"Before": "#7C8798", "Boom": "#B45309", "Crash": "#2563EB",
+                  "2015-2024": "#7C8798", "2025": "#B45309", "2026 YTD": "#2563EB"}
 
 @st.cache_data
 def load_returns():
@@ -51,15 +58,15 @@ def run_ols(y, x, alpha_level=0.05):
     return beta_hat, se_beta_hat, t_crit, r_squared, n
 
 
-def results_by_period(returns, y_name, regressors, periods, alpha_level=0.05):
+def results_by_period(returns, y_name, regressors, period_dates, periods, alpha_level=0.05):
     """
     Run the regression for each chosen period and return one row per period and regressor.
     """
     rows = []
-    for label in PERIODS:
+    for label in period_dates:
         if label not in periods:
             continue
-        start, end = PERIODS[label]
+        start, end = period_dates[label]
         data = returns.loc[start:end]
         beta_hat, se, t_crit, r2, n = run_ols(data[y_name], data[regressors], alpha_level)
 
@@ -82,16 +89,16 @@ def results_by_period(returns, y_name, regressors, periods, alpha_level=0.05):
     return pd.DataFrame(rows)
 
 
-def make_scatter(returns, y_name, regressors, periods, alpha_level=0.05):
+def make_scatter(returns, y_name, regressors, period_dates, periods, alpha_level=0.05):
     """
     Scatter of daily returns against gold, with a fitted line for each chosen period.
     Any other regressors are held at their average for that period.
     """
     fig = go.Figure()
-    for label in PERIODS:
+    for label in period_dates:
         if label not in periods:
             continue
-        start, end = PERIODS[label]
+        start, end = period_dates[label]
         data = returns.loc[start:end] * 100         # returns in %
         beta_hat, se, t_crit, r2, n = run_ols(data[y_name], data[regressors], alpha_level)
 
@@ -129,13 +136,13 @@ def make_scatter(returns, y_name, regressors, periods, alpha_level=0.05):
     return fig
 
 
-def make_dot_whisker(by_period, regressors, confidence):
+def make_dot_whisker(by_period, regressors, period_dates, confidence):
     """
     Each beta as a dot with its confidence interval, one colour per period.
     Dashed lines at 0 (no link) and 1 (one-for-one with gold).
     """
     fig = go.Figure()
-    for label in PERIODS:
+    for label in period_dates:
         rows = by_period[by_period["Period"] == label]
         if rows.empty:
             continue
@@ -187,12 +194,26 @@ def render():
     )
     y_name, regressors = RELATIONSHIPS[relationship]
 
+    scheme = st.radio(
+        "Split the data by",
+        options = ["Boom and crash", "Calendar years"],
+        horizontal = True,
+        key = "cha_scheme",
+    )
+    if scheme == "Boom and crash":
+        period_dates = PHASES
+    else:
+        period_dates = YEARS
+
     chosen = st.multiselect(
         "Periods",
-        options = list(PERIODS),
-        default = list(PERIODS),
-        key = "cha_per",
+        options = list(period_dates),
+        default = list(period_dates),
+        key = f"cha_per_{scheme}",
     )
+    if scheme == "Boom and crash":
+        st.caption(f"Before: 2015-2024 | Boom: Jan 2025 to silver's peak on {SILVER_PEAK:%d %b %Y} | Crash: after the peak")
+
     confidence = st.select_slider(
         "Confidence level",
         options = [0.90, 0.95, 0.99],
@@ -205,7 +226,7 @@ def render():
         st.warning("Pick at least one period to see the results.")
         return
 
-    by_period = results_by_period(returns, y_name, regressors, chosen, 1 - confidence)   # 95% confidence -> alpha 0.05
+    by_period = results_by_period(returns, y_name, regressors, period_dates, chosen, 1 - confidence)
 
     view = st.radio(
         "Chart",
@@ -214,9 +235,9 @@ def render():
         key = "cha_view",
     )
     if view == "Scatter":
-        st.plotly_chart(make_scatter(returns, y_name, regressors, chosen, 1 - confidence))
+        st.plotly_chart(make_scatter(returns, y_name, regressors, period_dates, chosen, 1 - confidence))
     else:
-        st.plotly_chart(make_dot_whisker(by_period, regressors, confidence))
+        st.plotly_chart(make_dot_whisker(by_period, regressors, period_dates, confidence))
 
     st.caption(f"Confidence intervals at the {confidence:.0%} level")
     st.dataframe(by_period.round(3), hide_index = True, width = "stretch")
