@@ -100,6 +100,8 @@ def make_scatter(returns, y_name, regressors, periods, alpha_level=0.05):
             y = data[y_name],
             mode = "markers",
             name = label,
+            legendgroup = label,
+            showlegend = False,
             marker = dict(size = 4, opacity = 0.3, color = PERIOD_COLOURS[label]),
         ))
 
@@ -112,7 +114,8 @@ def make_scatter(returns, y_name, regressors, periods, alpha_level=0.05):
             x = line_x,
             y = line_y,
             mode = "lines",
-            name = f"{label} fit (beta = {beta_hat[1]:.2f})",
+            name = f"{label} (β = {beta_hat[1]:.2f})",
+            legendgroup = label,
             line = dict(color = PERIOD_COLOURS[label], width = 3),
         ))
 
