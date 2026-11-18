@@ -28,3 +28,73 @@ FRED_GVZ = "GVZCLS"
 SKEW_URL = (
     "https://cdn.cboe.com/api/global/us_indices/daily_prices/SKEW_History.csv"
 )
+
+# download the extra financial data
+
+@st.cache_data(ttl=3600)
+def get_fred_data(series):
+
+    url = (
+        "https://fred.stlouisfed.org/graph/fredgraph.csv"
+        f"?id={series}&cosd={START_DATE}"
+    )
+
+    response = requests.get(url, timeout=30)
+    response.raise_for_status()
+
+    data = pd.read_csv(io.StringIO(response.text))
+
+    data.columns = ["Date", series]
+    data["Date"] = pd.to_datetime(data["Date"])
+    data[series] = pd.to_numeric(data[series], errors="coerce")
+
+    data = data.dropna(subset=[series])
+    data = data.set_index("Date").sort_index()
+
+    # save a copy in the data folder
+    data.to_csv(DATA_FOLDER / f"{series}.csv")
+
+    return data
+
+
+@st.cache_data(ttl=3600)
+def get_skew_data():
+
+    response = requests.get(SKEW_URL, timeout=30)
+    response.raise_for_status()
+
+    data = pd.read_csv(io.StringIO(response.text))
+
+    date_col = next(
+        col for col in data.columns
+        if "DATE" in col.upper()
+    )
+
+    skew_col = next(
+        col for col in data.columns
+        if "SKEW" in col.upper()
+    )
+
+    data = data[[date_col, skew_col]].copy()
+    data.columns = ["Date", "SKEW"]
+
+    data["Date"] = pd.to_datetime(data["Date"], errors="coerce")
+    data["SKEW"] = pd.to_numeric(data["SKEW"], errors="coerce")
+
+    data = data.dropna()
+    data = data.set_index("Date").sort_index()
+
+    # save the original observations
+    data.to_csv(DATA_FOLDER / "SKEW.csv")
+
+    return data
+
+
+@st.cache_data(ttl=3600)
+def load_extra_data():
+
+    real_rates = get_fred_data(FRED_DFII10)
+    gold_volatility = get_fred_data(FRED_GVZ)
+    skew = get_skew_data()
+
+    return real_rates, gold_volatility, skew
