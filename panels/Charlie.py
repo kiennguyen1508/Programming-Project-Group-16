@@ -172,6 +172,7 @@ def render():
     Draw my panel inside the dashboard.
     """
     st.subheader("Silver vs gold regression")
+    st.caption("By Charlie O'Sullivan | Data: Yahoo Finance daily prices")
 
     returns = load_returns()
 
