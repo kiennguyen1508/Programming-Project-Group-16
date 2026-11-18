@@ -187,28 +187,20 @@ def render():
 def overview():
     """
     Small preview of Panel 1 for the overview grid.
-    Uses the default settings: since 2025, all four assets, 4% risk-free rate.
+    Growth of 100 for all four assets since 2025, chart only
     """
     prices = load_prices()
     recent = prices.loc[start_date(prices, "Since 2025"):, list(COLOURS)]
     rebased = recent / recent.iloc[0] * 100
-    stats = performance_stats(recent)
 
     # Same chart as the full panel, made smaller and without the tool bar
     fig = make_price_chart(rebased)
     fig.update_layout(height=220,yaxis_title=None,
                       margin=dict(l=0,r=0,t=30,b=0))
-    st.plotly_chart(fig, config={"displayModeBar":False},
-                    key = "p1_overview_chart")
+    fig.update_yaxes(nticks=3)
+    st.plotly_chart(fig, config={"staticPlot" : True},
+                    key="p1_overview_chart")
     
-    # Three headline numbers
-    best = stats["Total return"].idxmax()
-    safest = stats["Sharpe ratio"].idxmax()
-    deepest = stats["Max drawdown"].idxmin()
-    c1, c2, c3 = st.columns(3)
-    c1.metric(f"Highest return · {best}", f"{stats.loc[best, 'Total return']:+.1%}")
-    c2.metric(f"Best Sharpe · {safest}", f"{stats.loc[safest, 'Sharpe ratio']:.2f}")
-    c3.metric(f"Deepest drawdown · {deepest}", f"{stats.loc[deepest, 'Max drawdown']:.1%}")
 
 def start_date(prices, period):
     """

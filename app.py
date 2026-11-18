@@ -14,7 +14,7 @@ PANELS = {
     },
     "performance" : {
         "title" : "Performance and ratios",
-        "question" : "Which asset paid best for the risk it carried",
+        "question" : "How each asset has grown since 2025",
         "full" : Kien.render,
         "preview": getattr(Kien, "overview", None),
     },
