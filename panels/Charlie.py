@@ -26,6 +26,37 @@ RELATIONSHIPS = {"Silver vs Gold": ("Silver", ["Gold"]),
 PERIOD_COLOURS = {"Before": "#7C8798", "Boom": "#B45309", "Crash": "#2563EB",
                   "2015-2024": "#7C8798", "2025": "#B45309", "2026 YTD": "#2563EB"}
 
+METHOD_NOTES = """
+**Data.** Daily closing prices from Yahoo Finance: gold (GC=F), silver (SI=F) and Brent crude (BZ=F) futures,
+plus COMEX copper futures (HG=F) from the shared macro file. Returns are daily log returns,
+ln(P today) - ln(P yesterday), which are the first differences of log prices. Using returns instead of prices
+avoids a spurious regression, because prices trend over time and two trending series can look related when they are not.
+
+**Periods.** The boom and crash split is at silver's highest closing price since January 2025, found from the data.
+Before is 2015 to 2024, Boom runs from January 2025 to the peak, and Crash is everything after the peak.
+
+**Model.** OLS by matrix formula, β̂ = (X'X)⁻¹X'Y, written by hand with NumPy and checked against statsmodels
+in `charlie_regression.ipynb` (the estimates match exactly). In Silver vs Gold + Copper, each β̂ is ceteris paribus:
+it shows the effect of one metal holding the other constant.
+
+**Standard errors.** White robust standard errors by default (the HC1 version, with an n / (n - k - 1) correction),
+because daily return volatility is not constant over time (heteroskedasticity). The toggle switches to ordinary
+standard errors, which assume constant error variance. β̂ is the same either way; only the uncertainty changes.
+
+**Tests.** Two t-tests for each slope: H0: β = 0 (no link) and H0: β = 1 (one-for-one). The confidence interval is
+β̂ +/- t_crit x SE, at the level chosen on the slider.
+
+**Limitations.**
+- The regression shows association, not causation. It describes how silver moved with gold on the same day;
+  it does not forecast future returns or show that gold causes silver to move.
+- Daily returns have fat tails, so a few extreme days (such as the large falls after silver's peak) can pull β̂ up.
+  The robust standard errors make the intervals wider to reflect this.
+- The Boom and Crash periods are much shorter than Before, so their estimates are less precise.
+- Brent crude and the metals do not close at exactly the same time each day, which can bias daily betas towards zero.
+- Futures prices jump slightly when contracts roll over.
+- R² always rises when a regressor is added, so it should not be compared between Silver vs Gold and Silver vs Gold + Copper.
+"""
+
 @st.cache_data
 def load_returns():
     """
@@ -318,6 +349,9 @@ def render():
         st.caption(f"Confidence intervals at the {confidence:.0%} level, assuming constant error variance")
 
     st.dataframe(by_period.round(3), hide_index = True, width = "stretch")
+
+    with st.expander("Method and limitations"):
+        st.markdown(METHOD_NOTES)
 
 
 def overview():
