@@ -318,3 +318,19 @@ def render():
         st.caption(f"Confidence intervals at the {confidence:.0%} level, assuming constant error variance")
 
     st.dataframe(by_period.round(3), hide_index = True, width = "stretch")
+
+
+def overview():
+    """
+    Small preview for the overview grid: silver's beta on gold before, during and after the boom.
+    """
+    returns = load_returns()
+    by_period = results_by_period(returns, "Silver", ["Gold"], PHASES, list(PHASES))
+    crash_beta = by_period[by_period["Period"] == "Crash"]["Beta"].iloc[0]
+
+    fig = make_dot_whisker(by_period, ["Gold"], PHASES, 0.95)
+    fig.update_layout(height = 300, xaxis_title = None, margin = dict(l=10, r=10, t=30, b=0))
+    fig.update_yaxes(showticklabels = False)
+    st.plotly_chart(fig, config = {"staticPlot": True}, key = "cha_overview_chart")
+    st.caption(f"After silver's peak on {SILVER_PEAK:%d %b %Y}, a 1% move in gold was associated "
+               f"with about a {crash_beta:.1f}% move in silver")
