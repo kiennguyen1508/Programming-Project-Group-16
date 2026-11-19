@@ -255,3 +255,55 @@ def create_3d_surface(data, title):
 
     return figure
 
+# compare the gold and S&P 500 distributions across periods
+
+def compare_periods(data):
+
+    # separate the observations into two periods
+    before_2025 = data[
+        data["Period"] == "Before 2025"
+    ]
+
+    after_2025 = data[
+        data["Period"] == "2025 onwards"
+    ]
+
+    # create the two 3D density graphs
+    figure_before = create_3d_surface(
+        before_2025,
+        "Gold and S&P 500 Joint Distribution: Before 2025"
+    )
+
+    figure_after = create_3d_surface(
+        after_2025,
+        "Gold and S&P 500 Joint Distribution: 2025 Onwards"
+    )
+
+    return figure_before, figure_after
+
+
+# calculate the correlation between Gold and the S&P 500
+
+def calculate_correlation(data):
+
+    correlation = data["Gold"].corr(data["S&P 500"])
+
+    return correlation
+
+
+# calculate average daily returns and volatility
+
+def calculate_summary(data):
+
+    summary = pd.DataFrame({
+        "Average daily return (%)": [
+            data["Gold"].mean() * 100,
+            data["S&P 500"].mean() * 100
+        ],
+        "Daily volatility (%)": [
+            data["Gold"].std() * 100,
+            data["S&P 500"].std() * 100
+        ]
+    }, index=["Gold", "S&P 500"])
+
+    return summary
