@@ -7,8 +7,8 @@ st.set_page_config(page_title="Econ Dashboard", layout="wide")
 #    and the function that draws the full panel
 PANELS = {
     "regression" : {
-        "title" : "Silver vs gold regression",
-        "question" : "How far does silver move for each 1% move in gold?",
+        "title" : "Regression analysis: silver, oil and gold",
+        "question" : "How much does silver move with gold, and did that change through its boom and crash?",
         "full" : Charlie.render,
         "preview": getattr(Charlie, "overview", None),
     },
