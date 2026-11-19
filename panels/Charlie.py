@@ -257,6 +257,10 @@ def make_3d(returns, y_name, regressors, period_dates, label, alpha_level=0.05):
             xaxis_title = f"{x1} (%)",
             yaxis_title = f"{x2} (%)",
             zaxis_title = f"{y_name} (%)",
+            aspectmode = "manual",
+            aspectratio = dict(x = 1.5, y = 1.5, z = 1),
+            camera = dict(eye = dict(x = 1, y = 2.1, z = 0.6),
+                          center = dict(x = 0, y = 0, z = -0.25)),
         ),
         margin = dict(l=0, r=0, t=40, b=0),
     )
@@ -280,12 +284,29 @@ def render():
     )
     y_name, regressors = RELATIONSHIPS[relationship]
 
-    scheme = st.radio(
-        "Split the data by",
-        options = ["Boom and crash", "Calendar years"],
-        horizontal = True,
-        key = "cha_scheme",
-    )
+    col_split, col_conf, col_robust = st.columns([2, 1, 1], vertical_alignment = "bottom")
+    with col_split:
+        scheme = st.radio(
+            "Split the data by",
+            options = ["Boom and crash", "Calendar years"],
+            horizontal = True,
+            key = "cha_scheme",
+        )
+    with col_conf:
+        confidence = st.select_slider(
+            "Confidence level",
+            options = [0.90, 0.95, 0.99],
+            value = 0.95,
+            format_func = lambda c: f"{c:.0%}",
+            key = "cha_conf",
+        )
+    with col_robust:
+        robust = st.toggle(
+            "Robust standard errors (White)",
+            value = True,
+            key = "cha_robust",
+        )
+
     if scheme == "Boom and crash":
         period_dates = PHASES
     else:
@@ -299,20 +320,6 @@ def render():
     )
     if scheme == "Boom and crash":
         st.caption(f"Before: 2015-2024 | Boom: Jan 2025 to silver's peak on {SILVER_PEAK:%d %b %Y} | Crash: after the peak")
-
-    confidence = st.select_slider(
-        "Confidence level",
-        options = [0.90, 0.95, 0.99],
-        value = 0.95,
-        format_func = lambda c: f"{c:.0%}",
-        key = "cha_conf",
-    )
-
-    robust = st.toggle(
-        "Robust standard errors (White)",
-        value = True,
-        key = "cha_robust",
-    )
 
     if not chosen:
         st.warning("Pick at least one period to see the results.")
@@ -343,11 +350,11 @@ def render():
         st.plotly_chart(make_3d(returns, y_name, regressors, period_dates, which, 1 - confidence))
         st.caption("Drag to rotate. Each dot is one trading day, and the gold surface is the fitted regression plane.")
 
+    st.markdown("**Regression results**")
     if robust:
         st.caption(f"Confidence intervals at the {confidence:.0%} level, using White robust standard errors")
     else:
         st.caption(f"Confidence intervals at the {confidence:.0%} level, assuming constant error variance")
-
     st.dataframe(by_period.round(3), hide_index = True, width = "stretch")
 
     with st.expander("Method and limitations"):
