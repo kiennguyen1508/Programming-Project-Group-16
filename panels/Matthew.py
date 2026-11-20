@@ -56,7 +56,7 @@ def make_heatmap(r_table: pd.DataFrame, title: str):
         fig.update_yaxes(showticklabels=False, showgrid=False, ticks= "")
         fig.update_traces(textfont_size=13)
         fig.update_layout(height=650, margin=dict(l=10, r=10, t=50, b=10),
-                          coloraxis_colorbar=dict(thinkness=12, title="r"))
+                          coloraxis_colorbar=dict(thickness=12, title="r"))
         return fig
     
 
