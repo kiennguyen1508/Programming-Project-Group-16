@@ -42,9 +42,9 @@ def make_heatmap(r_table: pd.DataFrame, title: str):
                     zmin=-1, zmax=1, title=title)
     for name in r_table.index:
         fig.add_annotation(x=name, y=name, text=f"<b>{name}</b>", showarrow=False)
-        fig.update_xaxes(showticklabels=False, showgrid=False, ticks = "")
-        fig.update_yaxes(showticklabels=False, showgrid=False, ticks = "")
-        return fig
+    fig.update_xaxes(showticklabels=False, showgrid=False, ticks = "")
+    fig.update_yaxes(showticklabels=False, showgrid=False, ticks = "")
+    return fig
 
 def hide_cells(r_table: pd.DataFrame, p_table: pd.DataFrame, cutoff: float = 0.05):
     """Blank out the repeated half, and other non statisitically significant cells."""
