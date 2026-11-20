@@ -39,7 +39,7 @@ def correlation_table(returns: pd.DataFrame) -> tuple:
 def make_heatmap(r_table: pd.DataFrame, title: str):
     """Correlation heatmap with each asset's name written on the diagonal."""
     fig = px.imshow(r_table.round(2), text_auto=True, color_continuous_scale="RdBu_r", 
-                    zmin=-1, zmax=1, titel=title)
+                    zmin=-1, zmax=1, title=title)
     for name in r_table.index:
         fig.add_annotation(x=name, y=name, text=f"<b>{name}</b>", showarrow=False)
         fig.update_xaxes(showticklabels=False, showgrid=False, ticks = "")
