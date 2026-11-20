@@ -37,16 +37,22 @@ def correlation_table(returns: pd.DataFrame) -> tuple:
     return r_table, p_table
 
 def make_heatmap(r_table: pd.DataFrame, title: str):
-    """Draw one correlation heatmap: red=move together, blue = move opposite."""
-    fig = px.imshow(r_table.round(2), text_auto=True, color_continuous_scale="RdBu_r", zmin=-1, zmax=1, title = title, )
-    return fig 
+    """Correlation heatmap with each asset's name written on the diagonal."""
+    fig = px.imshow(r_table.round(2), text_auto=True, color_continuous_scale="RdBu_r", 
+                    zmin=-1, zmax=1, titel=title)
+    for name in r_table.index:
+        fig.add_annotation(x=name, y=name, text=f"<b>{name}</b>", showarrow=False)
+        fig.update_xaxes(showticklabels=False, showgrid=False, ticks = "")
+        fig.update_yaxes(showticklabels=False, showgrid=False, tickes= "")
+        return fig
 
 def hide_cells(r_table: pd.DataFrame, p_table: pd.DataFrame, cutoff: float = 0.05):
     """Blank out the repeated half, and other non statisitically significant cells."""
-    bottom_half = np.tril(np.ones(r_table.shape, dtype=bool))
+    bottom_half = np.tril(np.ones(r_table.shape, dtype=bool), k=-1)
+    diagonal = np.eye(len(r_table), dtype=bool)
     not_significant = p_table.values >= cutoff
-    hidden = r_table.mask(bottom_half | not_significant)
-    return hidden.iloc[:-1,1:]
+    return r_table.mask(bottom_half | diagonal | not_significant)
+    
 
 def fisher_z_test(r1: float, n1: int, r2: float, n2: int) -> tuple:
     """Test whether two correlations from separate periods are really different."""
@@ -77,13 +83,15 @@ def make_animated_heatmap(returns: pd.DataFrame, assets: list, cutoff: float):
                     x=list(frames[0].columns),
     y=list(frames[0].index),
     color_continuous_scale="RdBu_r", zmin=-1, zmax=1)
-    for step, year in zip(fig.layout.sliders[0].steps, years):
+    for frame, step, year in zip(fig.frames, fig.layout.sliders[0].steps, years):
+        frame.name = str(year)
+        step.args = [[str(year)], step.args[1]]
         step.label = str(year)
-        fig.layout.sliders[0].currentvalue.prefix = "Year: "
-        play = fig.layout.updatemenus[0].buttons[0].args[1]
-        play["frame"]["duration"] = 1500
-        play["transition"]["duration"] = 500
-        return fig
+    fig.layout.sliders[0].currentvalue.prefix = "Year: "
+    play = fig.layout.updatemenus[0].buttons[0].args[1]
+    play["frame"]["duration"] = 1500
+    play["transition"]["duration"] = 500
+    return fig
 
 def result_sentence(a, b, r1, r2, p, cutoff, start) -> str:
     """Write a plain-english summary of the Fisher Test result."""
