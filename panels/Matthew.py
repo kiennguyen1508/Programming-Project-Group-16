@@ -84,20 +84,20 @@ def make_heatmap(r_table, p_table, cutoff, title, pair=None):
     for name in names:
         fig.add_annotation(x=name, y=name, text=f"<b>{NAMELAYOUT.get(name, name)}</b>",
                            showarrow=False, font=dict(size=13, color=LIGHT_TEXT))
-        if pair and pair[0] != pair[1] and pair[0] in names and pair[1] in names:
-            i, j = sorted([names.index(pair[0]), names.index(pair[1])])
-            fig.add_shape(type="rect", x0=j - 0.5, x1=j + 0.5, y0=i - 0.5, y1=i + 0.5,
-                          line=dict(color="white", width=2))
-        subtitle = (f"<span style='font-size:13px;color:{SOFT_TEXT}'>{title} . "
-                    f"n.s. = not significant (p >= {cutoff:.2f}) . outlined = pair under test</span>")
-        fig.update_xaxes(visible=False)
-        fig.update_yaxes(visible=False, autorange="reversed")
-        fig.update_layout(height=450, margin=dict(l=10, r=10, t=80, b=10),
-                            paper_bgcolor="rgba(0,0,0,0)",
-                            plot_bgcolor="rgba(0,0,0,0)",
-                            title=dict(text=f"<b>Which assets tend to move together></b><br>{subtitle}",
-                                        x=0.01, font=dict(color=LIGHT_TEXT, size=20)))
-        return fig
+    if pair and pair[0] != pair[1] and pair[0] in names and pair[1] in names:
+        i, j = sorted([names.index(pair[0]), names.index(pair[1])])
+        fig.add_shape(type="rect", x0=j - 0.5, x1=j + 0.5, y0=i - 0.5, y1=i + 0.5,
+                        line=dict(color="white", width=2))
+    subtitle = (f"<span style='font-size:13px;color:{SOFT_TEXT}'>{title} . "
+                f"n.s. = not significant (p >= {cutoff:.2f}) . outlined = pair under test</span>")
+    fig.update_xaxes(visible=False)
+    fig.update_yaxes(visible=False, autorange="reversed")
+    fig.update_layout(height=450, margin=dict(l=10, r=10, t=80, b=10),
+                        paper_bgcolor="rgba(0,0,0,0)",
+                        plot_bgcolor="rgba(0,0,0,0)",
+                        title=dict(text=f"<b>Which assets tend to move together></b><br>{subtitle}",
+                                    x=0.01, font=dict(color=LIGHT_TEXT, size=20)))
+    return fig
 
 
 
@@ -132,34 +132,28 @@ def make_rolling_chart(returns: pd.DataFrame, a: str, b: str, window: int, start
                       yaxis_title="Correlation (r)", yaxis_range=[-1,1])
     return fig
 
-def make_animated_heatmap(returns: pd.DataFrame, assets: list, cutoff: float):
-    """One heatmap per calendar year, plays like a slidehow."""
+def make_animated_heatmap(returns, assets, cutoff):
     years = sorted(returns.index.year.unique())
-    frames = []
+    figs = {}
     for year in years:
         r_table, p_table = correlation_table(returns.loc[str(year), assets])
-        frames.append(hide_cells(r_table,p_table, cutoff).round(2))
-    fig = px.imshow(np.stack(frames), animation_frame=0, text_auto=True,
-                    x=list(frames[0].columns),
-    y=list(frames[0].index),
-    color_continuous_scale="RdBu_r", zmin=-1, zmax=1, aspect="auto")
-    for frame, step, year in zip(fig.frames, fig.layout.sliders[0].steps, years):
-        frame.name = str(year)
-        step.args = [[str(year)], step.args[1]]
-        step.label = str(year)
-    fig.layout.sliders[0].currentvalue.prefix = "Year: "
-    play = fig.layout.updatemenus[0].buttons[0].args[1]
-    play["frame"]["duration"] = 1500
-    play["transition"]["duration"] = 500
-    for name in assets:
-        fig.add_annotation(x=name, y=name, text=f"<b>{NAMELAYOUT.get(name, name)}</b>",
-                         showarrow=False, font=dict(size=12))
-    fig.update_xaxes(showticklabels=False, showgrid=False, ticks="")
-    fig.update_yaxes(showticklabels=False, showgrid=False, ticks="")
-    fig.update_traces(textfont_size=13)
-    fig.update_layout(height=550, margin=dict(l=10, r=10, t=50, b=10),
-                      coloraxis_colorbar=dict(thickness=12, title="r:Correlation Coefficient"))
+        figs[year] = make_heatmap(r_table, p_table, cutoff, f"Year: {year}")
+    fig = go.Figure(figs[years[0]])
+    fig.frames = [go.Frame(data=figs[y].data, name=str(y),
+                           layout=dict(title=figs[y].layout.title)) for y in years]
+
+    play = dict(frame=dict(duration=1500, redraw=True), transition=dict(duration=500), fromcurrent=True)
+    stop = dict(frame=dict(duration=0, redraw=False), mode="immediate")
+    fig.update_layout(height=550, margin=dict(l=10, r=10, t=80, b=10),
+        updatemenus=[dict(type="buttons", direction="left", x=0, y=-0.02, xanchor="left", yanchor="top",
+            bgcolor="#1C2230", font=dict(color=LIGHT_TEXT),
+            buttons=[dict(label="▶ Play", method="animate", args=[None, play]),
+                     dict(label="■ Pause", method="animate", args=[[None], stop])])],
+        sliders=[dict(x=0.2, y=-0.02, len=0.8, currentvalue=dict(visible=False),
+            font=dict(color=SOFT_TEXT),
+            steps=[dict(label=str(y), method="animate", args=[[str(y)], stop]) for y in years])])
     return fig
+
 
 def result_sentence(a, b, r1, r2, p, cutoff, start) -> str:
     """Write a plain-english summary of the Fisher Test result."""
