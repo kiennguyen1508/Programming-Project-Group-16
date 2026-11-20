@@ -106,7 +106,7 @@ def make_animated_heatmap(returns: pd.DataFrame, assets: list, cutoff: float):
     play["frame"]["duration"] = 1500
     play["transition"]["duration"] = 500
     for name in assets:
-        fig.add_notation(x=name, y=name, text=f"<b>{NAMELAYOUT.get(name, name)}</b>",
+        fig.add_annotation(x=name, y=name, text=f"<b>{NAMELAYOUT.get(name, name)}</b>",
                          showarrow=False, font=dict(size=12))
     fig.update_xaxes(showticklabels=False, showgrid=False, ticks="")
     fig.update_yaxes(showticklabels=False, showgrid=False, ticks="")
@@ -198,3 +198,14 @@ Correlation is not causation, and short periods give less reliable results etc e
 This is just a test paragraph for now, I'm not sure if this is necessary. 
 More detail can be added later if we decide.
 """)
+
+
+def overview():
+    """Small preview for our opening page, shows all the assets for the whole period."""
+    returns = get_returns().join(load_macro(), how="inner").dropna()
+    r_table, p_table = correlation_table(returns)
+    fig = make_heatmap(hide_cells(r_table, p_table), None)
+    fig.update_layout(height=370, margin=dict(l=0, r=0, t=10, b=0))
+    fig.update_traces(textfont_size=11)
+    fig.update_annotations(font_size=10)
+    st.plotly_chart(fig, width="stretch", key="p3_preview", config={"displayModeBar": False})
