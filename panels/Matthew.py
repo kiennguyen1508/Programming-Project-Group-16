@@ -43,7 +43,7 @@ def make_heatmap(r_table: pd.DataFrame, title: str):
     for name in r_table.index:
         fig.add_annotation(x=name, y=name, text=f"<b>{name}</b>", showarrow=False)
         fig.update_xaxes(showticklabels=False, showgrid=False, ticks = "")
-        fig.update_yaxes(showticklabels=False, showgrid=False, tickes= "")
+        fig.update_yaxes(showticklabels=False, showgrid=False, ticks = "")
         return fig
 
 def hide_cells(r_table: pd.DataFrame, p_table: pd.DataFrame, cutoff: float = 0.05):
