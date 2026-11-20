@@ -10,6 +10,15 @@ import streamlit as st
 from data_loader import get_returns, SPLIT    
 
 
+
+NAMELAYOUT = {"S&P 500": "S&P<br>500", "Real Yield": "Real<br>Yield",
+"Commodities": "Commod-<br>ities"}
+GOLD_BLUE = [[0, "#2E6FD8"], [0.5, "#1C2230"], [1, "#E0A82E"]]
+NS_GREY = "#161B26"
+LIGHT_TEXT = "#E6E9EF"
+SOFT_TEXT = "#9AA4B8"
+
+
 def split_periods(returns: pd.DataFrame, assets: list) -> tuple:
     """Split daily returns into 'before 2025' and 'after 2025'."""
     chosen = returns[assets] #keep only the chosen assets
@@ -39,25 +48,62 @@ def correlation_table(returns: pd.DataFrame) -> tuple:
 
 
 
-NAMELAYOUT = {"S&P 500": "S&P<br>500", "Real Yield": "Real<br>Yield",
-"Commodities": "Commod-<br>ities"}
 
 
 
 
-def make_heatmap(r_table: pd.DataFrame, title: str):
-    """Correlation heatmap with each asset's name written on the diagonal."""
-    fig = px.imshow(r_table.round(2), text_auto=True, color_continuous_scale="RdBu_r", 
-                    zmin=-1, zmax=1, title=title, aspect="auto")                 # change square to rectangle
-    for name in r_table.index:
-        fig.add_annotation(x=name, y=name, text=f"<b>{NAMELAYOUT.get(name, name)}</b>", 
-                           showarrow=False, font=dict(size=12))
-        fig.update_xaxes(showticklabels=False, showgrid=False, ticks= "")
-        fig.update_yaxes(showticklabels=False, showgrid=False, ticks= "")
-        fig.update_traces(textfont_size=13)
-        fig.update_layout(height=650, margin=dict(l=10, r=10, t=50, b=10),
-                          coloraxis_colorbar=dict(thickness=12, title="r"))
+
+
+def make_heatmap(r_table, p_table, cutoff, title, pair=None):
+    names = list(r_table.index)
+    upper = np.triu(np.ones(r_table.shape, dtype=bool), k=1)
+    sig = r_table.where(upper & (p_table.values < cutoff))
+    ns = r_table.where(upper & (p_table.values >= cutoff)) * 0
+    labels = sig.map(lambda v: "" if pd.isna(v) else f"{v:+.2f}")
+    hover = [[f"<b>{a} * {b}</b><br>r = {r_table.loc[a, b]:+.2f} <br>p = {p_table.loc[a, b]:.3f}"
+              for b in names] for a in names]
+
+    fig = go.Figure()
+    fig.add_trace(go.Heatmap(z=ns.values, x=names, y=names,
+                              colorscale=[[0, NS_GREY], [1, NS_GREY]],
+                              showscale=False,
+                              xgap=3, ygap=3, hoverinfo="skip",
+                              text=ns.map(lambda v: "" if pd.isna(v) else "n.s.").values, 
+                              texttemplate="%{text}", textfont=dict(color="#4A5368", size=11)))
+
+
+    fig.add_trace(go.Heatmap(z=sig.values, x=names, y=names, zmin=-1, zmax=1,
+                             colorscale=GOLD_BLUE, xgap=3, ygap=3, 
+                             text=labels.values, texttemplate="%{text}",
+                             textfont=dict(size=14, color="white"),
+                             customdata=hover, hovertemplate="%{customdata}<extra></extra>",
+                             colorbar=dict(thickness=10, len=0.85, outlinewidth=0, tickvals=[-1, 0, 1],
+                                           ticktext=["-1 Opposite", "0 Unrelated", "+1 Together"],
+                                           tickfont=dict(color=SOFT_TEXT, size=11))))
+
+    for name in names:
+        fig.add_annotation(x=name, y=name, text=f"<b>{NAMELAYOUT.get(name, name)}</b>",
+                           showarrow=False, font=dict(size=13, color=LIGHT_TEXT))
+        if pair and pair[0] != pair[1] and pair[0] in names and pair[1] in names:
+            i, j = sorted([names.index(pair[0]), names.index(pair[1])])
+            fig.add_shape(type="rect", x0=j - 0.5, x1=j + 0.5, y0=i - 0.5, y1=i + 0.5,
+                          line=dict(color="white", width=2))
+        subtitle = (f"<span style='font-size:13px;color:{SOFT_TEXT}'>{title} . "
+                    f"n.s. = not significant (p >= {cutoff:.2f}) . outlined = pair under test</span>")
+        fig.update_xaxes(visible=False)
+        fig.update_yaxes(visible=False, autorange="reversed")
+        fig.update_layout(height=450, margin=dict(l=10, r=10, t=80, b=10),
+                            paper_bgcolor="rgba(0,0,0,0)",
+                            plot_bgcolor="rgba(0,0,0,0)",
+                            title=dict(text=f"<b>Which assets tend to move together></b><br>{subtitle}",
+                                        x=0.01, font=dict(color=LIGHT_TEXT, size=20)))
         return fig
+
+
+
+
+
+    
     
 
 def hide_cells(r_table: pd.DataFrame, p_table: pd.DataFrame, cutoff: float = 0.05):
@@ -112,7 +158,7 @@ def make_animated_heatmap(returns: pd.DataFrame, assets: list, cutoff: float):
     fig.update_yaxes(showticklabels=False, showgrid=False, ticks="")
     fig.update_traces(textfont_size=13)
     fig.update_layout(height=550, margin=dict(l=10, r=10, t=50, b=10),
-                      coloraxis_colorbar=dict(thickness=12, title="r"))
+                      coloraxis_colorbar=dict(thickness=12, title="r:Correlation Coefficient"))
     return fig
 
 def result_sentence(a, b, r1, r2, p, cutoff, start) -> str:
@@ -158,7 +204,7 @@ def render():
     if view == "Heatmap":
         r_table, p_table = correlation_table(period[assets])
         title = f"{start:%b %Y} to {end:%b %Y}"
-        st.plotly_chart(make_heatmap(hide_cells(r_table, p_table, cutoff), title), width="stretch")
+        st.plotly_chart(make_heatmap(r_table, p_table, cutoff, title, pair=(a,b)), width="stretch")
         st.caption(f"{len(period)} trading days. Blank cells are not significant (p >= {cutoff}).")
     elif view == "Animated":
         st.plotly_chart(make_animated_heatmap(returns, assets, cutoff), width="stretch")
@@ -204,7 +250,8 @@ def overview():
     """Small preview for our opening page, shows all the assets for the whole period."""
     returns = get_returns().join(load_macro(), how="inner").dropna()
     r_table, p_table = correlation_table(returns)
-    fig = make_heatmap(hide_cells(r_table, p_table), None)
+    fig = make_heatmap(r_table, p_table, 0.05, "")
+    fig.update_layout(title_text="")
     fig.update_layout(height=370, margin=dict(l=0, r=0, t=10, b=0))
     fig.update_traces(textfont_size=11)
     fig.update_annotations(font_size=10)
