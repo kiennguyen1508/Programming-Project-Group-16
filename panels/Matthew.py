@@ -36,15 +36,29 @@ def correlation_table(returns: pd.DataFrame) -> tuple:
             p_table.loc[a,b] = stats.pearsonr(returns[a], returns[b]).pvalue
     return r_table, p_table
 
+
+
+
+NAMELAYOUT = {"S&P 500": "S&P<br>500", "Real Yield": "Real<br>Yield",
+"Commodities": "Commod-<br>ities"}
+
+
+
+
 def make_heatmap(r_table: pd.DataFrame, title: str):
     """Correlation heatmap with each asset's name written on the diagonal."""
     fig = px.imshow(r_table.round(2), text_auto=True, color_continuous_scale="RdBu_r", 
-                    zmin=-1, zmax=1, title=title)
+                    zmin=-1, zmax=1, title=title, aspect="auto")                 # change square to rectangle
     for name in r_table.index:
-        fig.add_annotation(x=name, y=name, text=f"<b>{name}</b>", showarrow=False)
-    fig.update_xaxes(showticklabels=False, showgrid=False, ticks = "")
-    fig.update_yaxes(showticklabels=False, showgrid=False, ticks = "")
-    return fig
+        fig.add_annotation(x=name, y=name, text=f"<b>{NAMELAYOUT.get(name, name)}</b>", 
+                           showarrow=False, font=dict(size=12))
+        fig.update_xaxes(showticklabels=False, showgrid=False, ticks= "")
+        fig.update_yaxes(showticklabels=False, showgrid=False, ticks= "")
+        fig.update_traces(textfont_size=13)
+        fig.update_layout(height=650, margin=dict(l=10, r=10, t=50, b=10),
+                          coloraxis_colorbar=dict(thinkness=12, title="r"))
+        return fig
+    
 
 def hide_cells(r_table: pd.DataFrame, p_table: pd.DataFrame, cutoff: float = 0.05):
     """Blank out the repeated half, and other non statisitically significant cells."""
@@ -136,7 +150,7 @@ def render():
     if view == "Heatmap":
         r_table, p_table = correlation_table(period[assets])
         title = f"{start:%b %Y} to {end:%b %Y}"
-        st.plotly_chart(make_heatmap(hide_cells(r_table, p_table, cutoff), title))
+        st.plotly_chart(make_heatmap(hide_cells(r_table, p_table, cutoff), title), width="stretch")
         st.caption(f"{len(period)} trading days. Blank cells are not significant (p >= {cutoff}).")
     elif view == "Animated":
         st.plotly_chart(make_animated_heatmap(returns, assets, cutoff))
