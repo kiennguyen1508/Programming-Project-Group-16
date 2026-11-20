@@ -293,6 +293,31 @@ def describe(row, y_name, regressors, confidence):
             f"({confidence:.0%} CI {row['CI low']:.2f} to {row['CI high']:.2f}). This is {verdict}.")
 
 
+def compare(by_period, y_name, name, confidence):
+    """
+    z-test for whether one beta changed from each period to the next.
+    """
+    rows = by_period[by_period["Regressor"] == name]
+    alpha_level = 1 - confidence
+    z_crit = stats.norm.ppf(1 - alpha_level / 2)
+    lines = []
+    for i in range(1, len(rows)):
+        earlier = rows.iloc[i - 1]
+        later = rows.iloc[i]
+        z = (later["Beta"] - earlier["Beta"]) / np.sqrt(earlier["Std. Error"] ** 2 + later["Std. Error"] ** 2)
+
+        if z > z_crit:
+            result = "a significant rise"
+        elif z < -z_crit:
+            result = "a significant fall"
+        else:
+            result = "not a significant change"
+
+        lines.append(f"**{earlier['Period']} to {later['Period']}:** {y_name.lower()}'s β on {name.lower()} went from "
+                     f"{earlier['Beta']:.2f} to {later['Beta']:.2f} (z = {z:.2f}), {result} at the {confidence:.0%} level.")
+    return lines
+
+
 def render():
     """
     Draw my panel inside the dashboard.
@@ -386,6 +411,9 @@ def render():
     with st.expander("What the results mean", expanded = True):
         for i in range(len(by_period)):
             st.markdown(describe(by_period.iloc[i], y_name, regressors, confidence))
+        for name in regressors:
+            for line in compare(by_period, y_name, name, confidence):
+                st.markdown(line)
 
     with st.expander("Method and limitations"):
         st.markdown(METHOD_NOTES)
