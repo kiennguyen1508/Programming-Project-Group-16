@@ -96,7 +96,7 @@ def make_animated_heatmap(returns: pd.DataFrame, assets: list, cutoff: float):
     fig = px.imshow(np.stack(frames), animation_frame=0, text_auto=True,
                     x=list(frames[0].columns),
     y=list(frames[0].index),
-    color_continuous_scale="RdBu_r", zmin=-1, zmax=1)
+    color_continuous_scale="RdBu_r", zmin=-1, zmax=1, aspect="auto")
     for frame, step, year in zip(fig.frames, fig.layout.sliders[0].steps, years):
         frame.name = str(year)
         step.args = [[str(year)], step.args[1]]
@@ -105,6 +105,14 @@ def make_animated_heatmap(returns: pd.DataFrame, assets: list, cutoff: float):
     play = fig.layout.updatemenus[0].buttons[0].args[1]
     play["frame"]["duration"] = 1500
     play["transition"]["duration"] = 500
+    for name in assets:
+        fig.add_notation(x=name, y=name, text=f"<b>{NAMELAYOUT.get(name, name)}</b>",
+                         showarrow=False, font=dict(size=12))
+    fig.update_xaxes(showticklabels=False, showgrid=False, ticks="")
+    fig.update_yaxes(showticklabels=False, showgrid=False, ticks="")
+    fig.update_traces(textfont_size=13)
+    fig.update_layout(height=550, margin=dict(l=10, r=10, t=50, b=10),
+                      coloraxis_colorbar=dict(thickness=12, title="r"))
     return fig
 
 def result_sentence(a, b, r1, r2, p, cutoff, start) -> str:
@@ -153,7 +161,7 @@ def render():
         st.plotly_chart(make_heatmap(hide_cells(r_table, p_table, cutoff), title), width="stretch")
         st.caption(f"{len(period)} trading days. Blank cells are not significant (p >= {cutoff}).")
     elif view == "Animated":
-        st.plotly_chart(make_animated_heatmap(returns, assets, cutoff))
+        st.plotly_chart(make_animated_heatmap(returns, assets, cutoff), width="stretch")
         st.caption("Press play to step through each calendar year. This view uses every year, "
                    "so the time period slider doesn't apply. The year 2026 has only partial data.")
     else:
