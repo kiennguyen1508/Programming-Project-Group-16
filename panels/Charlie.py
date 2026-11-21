@@ -23,6 +23,13 @@ RELATIONSHIPS = {"Silver vs Gold": ("Silver", ["Gold"]),
                  "Silver vs Gold + Copper": ("Silver", ["Gold", "Copper"]),
                  "Oil vs Gold": ("Oil", ["Gold"])}
 
+RELATIONSHIP_NOTES = {"Silver vs Gold": "How did silver react to gold's movements? β is silver's average move for each "
+                                        "1% move in gold, so a β above 1 means silver's moves were bigger than gold's.",
+                      "Silver vs Gold + Copper": "Is silver a precious metal like gold, or an industrial metal like copper? "
+                                                 "Each β shows silver's link to one metal, holding the other constant.",
+                      "Oil vs Gold": "Did oil and gold move together, and did that change during the 2026 Iran tension? "
+                                     "A β near 0 means no link."}
+
 PERIOD_COLOURS = {"Before": "#7C8798", "Boom": "#B45309", "Crash": "#2563EB",
                   "2015-2024": "#7C8798", "2025": "#B45309", "2026 YTD": "#2563EB"}
 
@@ -318,6 +325,63 @@ def compare(by_period, y_name, name, confidence):
     return lines
 
 
+def answer(by_period, relationship, confidence):
+    """
+    Plain-English answer to the question behind the chosen relationship.
+    """
+    gold = by_period[by_period["Regressor"] == "Gold"]
+    n_periods = len(gold)
+    latest = gold.iloc[-1]
+
+    if relationship == "Silver vs Gold":
+        above = (gold["CI low"] > 1).sum()
+        if above == n_periods:
+            headline = "More strongly than gold in every period."
+        elif above > 0:
+            headline = "More strongly than gold in some periods."
+        else:
+            headline = "Not clearly more strongly than gold."
+        text = (f"**How did silver react to gold's movements?** {headline}\n\n"
+                f"In the {latest['Period']} period, a 1% move in gold was associated with about a "
+                f"{latest['Beta']:.1f}% move in silver on average. Silver's moves were significantly bigger "
+                f"than gold's in {above} of {n_periods} periods, at the {confidence:.0%} confidence level.")
+
+    elif relationship == "Silver vs Gold + Copper":
+        copper = by_period[by_period["Regressor"] == "Copper"]
+        latest_copper = copper.iloc[-1]
+        gold_bigger = (gold["Beta"].to_numpy() > copper["Beta"].to_numpy()).sum()
+        if gold_bigger == n_periods:
+            headline = "Mostly precious."
+        elif gold_bigger > 0:
+            headline = "Mixed."
+        else:
+            headline = "Mostly industrial."
+        text = (f"**Is silver a precious or an industrial metal?** {headline}\n\n"
+                f"In the {latest['Period']} period, holding the other metal constant, a 1% move in gold was associated "
+                f"with about a {latest['Beta']:.1f}% move in silver, and a 1% move in copper with about a "
+                f"{latest_copper['Beta']:.1f}% move. Silver moved more with gold than with copper in "
+                f"{gold_bigger} of {n_periods} periods.")
+
+    else:
+        clear = (gold["CI low"] > 0).sum() + (gold["CI high"] < 0).sum()
+        if clear == 0:
+            headline = "No clear link."
+        elif clear < n_periods:
+            headline = "Only sometimes."
+        else:
+            headline = "Yes."
+
+        if latest["Beta"] < 0:
+            move = "fall"
+        else:
+            move = "rise"
+        text = (f"**Did oil and gold move together?** {headline}\n\n"
+                f"In the {latest['Period']} period, a 1% rise in gold was associated with about a "
+                f"{abs(latest['Beta']):.1f}% {move} in oil on average. The link was significantly different from zero in "
+                f"{clear} of {n_periods} periods, at the {confidence:.0%} confidence level.")
+    return text
+
+
 def render():
     """
     Draw my panel inside the dashboard.
@@ -334,6 +398,7 @@ def render():
         key = "cha_rel",
     )
     y_name, regressors = RELATIONSHIPS[relationship]
+    st.caption(RELATIONSHIP_NOTES[relationship])
 
     col_split, col_conf, col_robust = st.columns([2, 1, 1], vertical_alignment = "bottom")
     with col_split:
@@ -414,6 +479,8 @@ def render():
         for name in regressors:
             for line in compare(by_period, y_name, name, confidence):
                 st.markdown(line)
+
+    st.info(answer(by_period, relationship, confidence))
 
     with st.expander("Method and limitations"):
         st.markdown(METHOD_NOTES)
