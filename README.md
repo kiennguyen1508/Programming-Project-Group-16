@@ -101,7 +101,7 @@ Each panel has its own "Method and Limitations" section in the app with the deta
 
 **Controls:** period, assets, a start-date slider, a Growth/Drawdown switch and a Replay button that animates the chart. The Stress days tab also has a VIX threshold (25 by default) and a choice between the average and the median.
 
-**Key findings:** Gold did not reliably rise after fear spikes. Over the full period it averaged +0.01% a day on the 391 stressed days, compared with +0.05% on calm days, while the S%P 500 averaged +0.13% on stressed days. The gold/silver ratio was the most predictable of the three: it moved back towards its average 81% of the time, againt a base rate of about 43-57%.
+**Key findings:** Gold did not reliably rise after fear spikes. Over the full period it averaged +0.01% a day on the 391 stressed days, compared with +0.05% on calm days, while the S%P 500 averaged +0.13% on stressed days. The gold/silver ratio was the most predictable of the three: it moved back towards its average 81% of the time, against a base rate of about 43-57%.
 
 ## Matthew's panel
 
