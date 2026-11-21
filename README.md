@@ -1,6 +1,6 @@
 # Gold and its Drivers: Economic & Finance Dashboard
 
-This interactive dashboard explores how the price of gold is related to, and affected by, other markets and economic factors between 2015 and 2026. It compares gold with silver, oil, copper and the S&P 500, and uses the VIX to capture market fear. Users can choose the time period, assets and settings in each panel to compare how these relationships changed over time.
+This interactive dashboard explores how the price of gold moves with other markets and economic factors between 2015 and 2026.
 
 Each panel compares the years before 2025 with the period since, to see whether gold's behaviour has changed.
 
