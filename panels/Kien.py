@@ -8,7 +8,7 @@ import numpy as np
 
 from data_loader import get_prices, get_macro, SPLIT
 
-#COLOURS = {"Gold": "#E0B252", "Silver": "#B8C1CF", "Oil": "#4FB39A", "S&P 500": "#9C8CFF"}
+
 COLOURS = {"Gold": "#E0B252", "Silver": "#B8C1CF", "Oil": "#4FB39A", "S&P 500": "#9C8CFF"}
 RATIOS = {
     "Gold / Silver" : ("Gold", "Silver"),
@@ -37,7 +37,7 @@ Sortino ratio = the same numerator ÷ downside deviation, which only counts days
 
 Copper is COMEX copper futures (HG=F, $ per pound) from the shared macro file. The Gold/Copper ratio compares a safe-haven asset with an industrial one: it tends to rise when markets fear a slowdown and fall when they expect growth.
 
-**Calm vs stressed days.** VIX closes from Cboe, via the shared macro file. A day counts as stressed if the VIX closed at or above the chosen level (default 25) on the previous trading day. Yesterday’s VIX is used because today’s VIX rises because stocks are falling today, which would make the comparison circular. Averages from fewer than about 20 days are unreliable. The chart shows the average daily return. The median gives a similar ranking and is less affected by a few extreme days.
+**Calm vs stressed days.** VIX closes from Cboe, via the shared macro file. A day counts as stressed if the VIX closed at or above the chosen level (default 25) on the previous trading day. Yesterday’s VIX is used because today’s VIX rises because stocks are falling today, which would make the comparison circular. Averages from fewer than about 20 days are unreliable. The chart shows the average or median daily return (you can swithc between them). The median gives a similar ranking and is less affected by a few extreme days.
 
 With few stressed days, one extreme day can dominate the average (e.g. the S&P 500’s +9.5% on 9 April 2025), so compare the average with the median and prefer the Max period for conclusions.
 
@@ -89,7 +89,7 @@ def show_ratios(prices, recent):
     )
     test = reversion_test(full, horizon)
     if test.empty:
-        st.caption("The ratio has never been beyond ±2σ of its rolling 5-year man, so there is nothing to test.")
+        st.caption("The ratio has never been beyond ±2σ of its rolling 5-year mean, so there is nothing to test.")
     else:
         st.dataframe(test.style.format({
             "Days" : "{:.0f}",
@@ -110,7 +110,13 @@ def show_stress(chosen):
     st.markdown("**How did each asset do when markets were scared?**")
     threshold = st.slider("VIX level that counts as stressed", 15, 40,
                     VIX_STRESS, key="p1_vix")
-    measure = "Average"
+    measure = st.radio(
+        "Measure",
+        ["Average","Median"],
+        horizontal = True,
+        key = "p1_measure",
+        help = "The median is less affected by a few extreme days."
+    )
     table, n_stressed, n_calm = regime_returns(
         chosen, load_vix(), threshold, "mean" if measure == "Average" else "median")
     st.caption(f"{n_stressed} stressed and {n_calm} calm days in this period. "
