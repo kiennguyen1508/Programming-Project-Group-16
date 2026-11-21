@@ -86,7 +86,7 @@ Programming-Project-Group-16/
 ## The panels
 Each panel has its own "Method and Limitations" section in the app with the details.
 
-## Charlie's panel
+### Charlie's panel
 
 
 ### Performance and ratios (Kien Nguyen)
@@ -103,16 +103,16 @@ Each panel has its own "Method and Limitations" section in the app with the deta
 
 **Key findings:** Gold did not reliably rise after fear spikes. Over the full period it averaged +0.01% a day on the 391 stressed days, compared with +0.05% on calm days, while the S%P 500 averaged +0.13% on stressed days. The gold/silver ratio was the most predictable of the three: it moved back towards its average 81% of the time, against a base rate of about 43-57%.
 
-## Matthew's panel
+### Matthew's panel
 
-## Michael's panel
+### Michael's panel
 
 ## Contributions
 
 | Member | Panel | Shared work |
 |---|---|---|
 | Charlie | Silver vs gold regression | write this later |
-| Kien Nguyen | Performance & ratios | write this later |
+| Kien Nguyen | Performance & ratios | Set up the repository and folder structure; built `data_loader.py` (price download, `get_prices()`, `get_returns()`) and later added the macro data (`get_macro()`, `get_macro_changes()`); built the overview grid in `app.py` and the dark theme; wrote the README apart from the other panel sections; kept `requirements.txt` up to date |
 | Matthew Herbert | Correlation heatmap | write this later |
 | Michael Gilgunn | Distribution & risk | write this later|
 
