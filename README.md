@@ -3,7 +3,7 @@
 This interactive dashboard explores how the price of gold is related to, and affected by, other markets and economic factors between 2015 and 2026. It compares gold with silver, oil, copper and the S&P 500, and uses the VIX to capture market fear. Users can choose the time period, assets and settings in each panel to compare how these relationships changed over time.
 
 ## Quick start
-Tested with Python 3.14.7 on macOS.
+You need Python 3.12 or newer (check with `python3 --version`). Tested with Python 3.14.7 on macOS.
 
 **1. Download the code.** Clone the repository and move into the project folder.
 ```bash
