@@ -29,8 +29,9 @@ pip install -r requirements.txt
 
 **4. Run the dashboard.**
 ```bash
-streamlit run app.py
+python -m streamlit run app.py
 ```
+Using `python -m` makes sure the Streamlit inside the virtual environment is used, not one installed elsewhere on your computer.
 The dashboard opens in your browser at http://localhost:8501.
 If that port is busy, Streamlit uses the next one (8502) and prints the address in the terminal.
 
