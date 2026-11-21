@@ -84,7 +84,7 @@ Programming-Project-Group-16/
 │   ├── Matthew.py            # correlation heatmap
 │   └── Michael.py            # distribution and risk
 ├── charlie_regression.ipynb  # notebook used while building the regression panel
-└── assets/                   # screenshot used in this
+└── assets/                   # screenshot used in this README
 ``` 
 
 ## The panels
@@ -124,6 +124,6 @@ Each panel has its own "Method and Limitations" section in the app with the deta
 - Gold, silver, oil and copper are future prices, which jump slightly when contracts roll over.
 - The S&P 500 is a price index, so it does not include dividends.
 - The saved data stops on 30 October 2026. Run the refresh commands above to update it.
-- This project was built for a university module and is not investment advice.
 - The "since 2025" period is less than two years long, so its results are less reliable than the 2015–2024 ones.
 - The dashboard shows how gold moves with other markets, not what causes those moves.
+- This project was built for a university module and is not investment advice.
