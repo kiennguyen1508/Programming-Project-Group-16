@@ -51,7 +51,9 @@ def load_prices():
     """
     Load the shared price data once, then reuse it on every rerun.
     """
-    prices = get_prices()
+    prices = get_prices() 
+    # I use a left join here because I didn't want to lose any gold/ silver/ oil days
+    # just because copper is missing that day. The gaps become NaN and get dropped later in the ratio.
     return prices.join(get_macro()["Copper"], how="left")
 
 @st.cache_data
@@ -68,7 +70,10 @@ def show_ratios(prices, recent):
     name = st.radio("Ratio" , list(RATIOS) , horizontal = True , key = "p1_ratio")
     top, bottom = RATIOS[name]
     ratio = (recent[top] / recent[bottom]).dropna()
-    full = (prices[top] / prices[bottom]).dropna()
+    # I keep two versions of the ratio on purpose. The chart only shows the period you picked,
+    # but I wanted the mean, bands and percentile to always use the full history,
+    # otherwise the "average" would change every time you click a different period.
+    full = (prices[top] / prices[bottom]).dropna() 
     stats = ratio_stats(full)
     st.plotly_chart(make_ratio_chart(ratio, name, stats["mean"], stats["std"]))
 
@@ -82,7 +87,7 @@ def show_ratios(prices, recent):
     st.markdown("**Do extreme readings revert?**")
     horizon = st.select_slider(
         "Look-ahead horizon",
-        options = [21,63,126],
+        options = [21,63,126], # I picked 1, 3 and 6 months (12 trading days is about a month)
         value = 63,
         format_func=lambda d: f"{d//21} month{'s' if d > 21 else ''}",
         key = "p1_horizon",
@@ -163,7 +168,9 @@ def show_performance(chosen):
     if len(chosen) < TRADING_DAYS:
         st.caption("This period is shorter than a year, so annualised figures are extrapolated and can look extreme.")
     st.info(price_summary(stats))
-    
+
+    # Max drawdown is in "higher is better" because the drawdowns are negtive numbers,
+    # so the highest one is actually the smallest fall. This looked wrong to me at the start too.
     higher_is_better = ["Total return", "Annualised return", "Max drawdown",
                         "Sharpe ratio", "Sortino ratio"]
     lower_is_better = ["Volatility (ann.)"]
@@ -211,9 +218,11 @@ def render():
     start = st.slider(
         "Start from",
         min_value = recent.index[0].date(),
-        max_value = recent.index[-21].date(),
+        max_value = recent.index[-21].date(), # I stop the slider a month before the end so there is always enough data to calculate anything
         value = recent.index[0].date(),
         format = "D MMM YYYY",
+        # I put the period in the key so Streamlit treats it as a new slider when you change period.
+        # With one fixed key it kept the old start date, which could be outside the new range.
         key = f"p1_start_{period}",
     )
     recent = recent.loc[pd.Timestamp(start):]
@@ -333,6 +342,8 @@ def make_replay_chart(rebased, max_frames = 100):
     Growth of 100 that draws itself over time when you press Play.
     Uses at most max_frames frames so long periods stay fast.
     """
+    # I limit it to about 100 frames because on the Max period there are 2000+ days
+    # and one frame per day made the replay quite slow.
     step = max(1, len(rebased) // max_frames)
     ends = list(range(step, len(rebased), step)) + [len(rebased)]
 
@@ -429,6 +440,8 @@ def reversion_test(full, horizon_days):
     rolling = full.rolling(REVERSION_WINDOW, min_periods=MIN_HISTORY)
     mean, std = rolling.mean(), rolling.std()
     future = full.shift(-horizon_days) / full - 1 # % change over the next N days
+    # I only count days that have at least 2 years of history behind them and a known value
+    # N days later, so every day is judged only on what was known at the time.
     usable = mean.notna() & future.notna()
     rows = {}
     for label, mask, back in [
@@ -442,6 +455,8 @@ def reversion_test(full, horizon_days):
             "Days" : len(moves),
             "Average change" : moves.mean(),
             "Moved back towards mean" : back[moves.index].mean(),
+            # I added the base rate so there is something to compare against. 60% sounds good,
+            # but not if the ratio moves that way 55% of the time anyway.
             "Base rate": back[usable].mean()
         }
     return pd.DataFrame(rows).T
@@ -459,6 +474,8 @@ def performance_stats(prices, risk_free = RISK_FREE_RATE):
     vol = returns.std() * np.sqrt(TRADING_DAYS)
     daily_rf = risk_free / TRADING_DAYS
     shortfall = (returns - daily_rf).clip(upper=0) #only days below the risk-free rate
+    # For Sortino, I only want the bad days to count as risk. I set the good days to 0 instead of 
+    # removing them, so the average is still taken over all days.
     downside_vol = np.sqrt((shortfall**2).mean()) * np.sqrt(TRADING_DAYS)
     drawdown = (prices / prices.cummax() - 1).min()
     return pd.DataFrame({
@@ -515,6 +532,9 @@ def regime_returns(prices, vix, threshold, measure="mean"):
     A day counts as stressed if the VIX closed at or above the threshold the day before.
     """
     returns = prices.pct_change().dropna()
+    # I use yesterday's VIX, not today's, because the VIX jumps on the same day stocks fall,
+    # so using today's would bascially be checking whether falling days are falling days, like a circle process
+    # I shift before reindexing so it's the previous VIX day, not the previous price day.
     prev_vix = vix.shift(1).reindex(returns.index)
     valid = prev_vix.notna()
     returns, prev_vix = returns[valid], prev_vix[valid]
