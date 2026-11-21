@@ -2,6 +2,8 @@
 
 This interactive dashboard explores how the price of gold is related to, and affected by, other markets and economic factors between 2015 and 2026. It compares gold with silver, oil, copper and the S&P 500, and uses the VIX to capture market fear. Users can choose the time period, assets and settings in each panel to compare how these relationships changed over time.
 
+Each panel compares the years before 2025 with the period since, to see whether gold's behaviour has changed.
+
 ## Quick start
 You need Python 3.12 or newer (check with `python3 --version`). Tested with Python 3.14.7 on macOS.
 
@@ -64,7 +66,7 @@ Every panel loads its data through `data_loader.py`, so all four panels use the 
 | `get_returns()` | Daily log returns of the four assets |
 | `get_macro()` | Levels of the macro series |
 | `get_macro_changes()` | Daily changes of the macro series: log returns for prices, basis points for the real yield, points for the VIX |
-| `SPLIT` | The date used to split "before" and "since 2025" (`2025-01-01`) 
+| `SPLIT` | The date used to split "before" and "since 2025" (`2025-01-01`) |
 
 ## Project structure
 
@@ -72,16 +74,18 @@ Every panel loads its data through `data_loader.py`, so all four panels use the 
 Programming-Project-Group-16/
 ├── app.py                    # puts the four panels on one page
 ├── data_loader.py            # downloads, saves and loads the shared data
-├── requirements.txt
+├── requirements.txt          # packages to install 
+├── .streamlit/config.toml    # dashboard theme
 ├── data/                     # saved CSV files
 ├── panels/
+│   ├── __init__.py           # lets app.py import the panels
 │   ├── Charlie.py            # regression
 │   ├── Kien.py               # performance and ratios
 │   ├── Matthew.py            # correlation heatmap
 │   └── Michael.py            # distribution and risk
 ├── charlie_regression.ipynb  # notebook used while building the regression panel
-└── assets/
-```
+└── assets/                   # screenshot used in this
+``` 
 
 ## The panels
 Each panel has its own "Method and Limitations" section in the app with the details.
@@ -121,3 +125,5 @@ Each panel has its own "Method and Limitations" section in the app with the deta
 - The S&P 500 is a price index, so it does not include dividends.
 - The saved data stops on 30 October 2026. Run the refresh commands above to update it.
 - This project was built for a university module and is not investment advice.
+- The "since 2025" period is less than two years long, so its results are less reliable than the 2015–2024 ones.
+- The dashboard shows how gold moves with other markets, not what causes those moves.
