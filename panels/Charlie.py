@@ -284,7 +284,7 @@ def make_3d(returns, y_name, regressors, period_dates, label, alpha_level=0.05):
     return fig
 
 
-def describe(row, y_name, regressors, confidence):
+def describe(row, y_name, regressors, confidence, one_for_one=True):
     """
     One plain-English sentence for one beta, using its confidence interval.
     """
@@ -294,7 +294,19 @@ def describe(row, y_name, regressors, confidence):
         if other != name:
             held = f", holding {other.lower()} constant"
 
-    if row["CI low"] > 1:
+    if row["Beta"] < 0:
+        direction = "fall"
+    else:
+        direction = "rise"
+
+    if not one_for_one:
+        if row["CI low"] > 0:
+            verdict = "a positive link"
+        elif row["CI high"] < 0:
+            verdict = "a negative link"
+        else:
+            verdict = "not clearly different from zero"
+    elif row["CI low"] > 1:
         verdict = "more than one-for-one"
     elif row["CI high"] < 0:
         verdict = "a negative link"
@@ -305,8 +317,8 @@ def describe(row, y_name, regressors, confidence):
     else:
         verdict = "not clearly different from zero"
 
-    return (f"**{row['Period']}:** a 1% move in {name.lower()}{held} was associated with about a "
-            f"{row['Beta']:.2f}% move in {y_name.lower()} on average "
+    return (f"**{row['Period']}:** a 1% rise in {name.lower()}{held} was associated with about a "
+            f"{abs(row['Beta']):.2f}% {direction} in {y_name.lower()} on average "
             f"({confidence:.0%} CI {row['CI low']:.2f} to {row['CI high']:.2f}). This is {verdict}.")
 
 
@@ -495,7 +507,7 @@ def render():
 
     with st.expander("What the results mean", expanded = True):
         for i in range(len(by_period)):
-            st.markdown(describe(by_period.iloc[i], y_name, regressors, confidence))
+            st.markdown(describe(by_period.iloc[i], y_name, regressors, confidence, one_for_one))
         for name in regressors:
             for line in compare(by_period, y_name, name, confidence):
                 st.markdown(line)
