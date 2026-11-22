@@ -64,7 +64,7 @@ def make_heatmap(r_table, p_table, cutoff, title, pair=None):
     sig = r_table.where(upper & (p_table.values < cutoff))
     ns = r_table.where(upper & (p_table.values >= cutoff)) * 0
     labels = sig.map(lambda v: "" if pd.isna(v) else f"{v:+.2f}")
-    hover = [[f"<b>{a} * {b}</b><br>r = {r_table.loc[a, b]:+.2f} <br>p = {p_table.loc[a, b]:.3f}"
+    hover = [[f"<b>{a} x {b}</b><br>r = {r_table.loc[a, b]:+.2f} <br>p = {p_table.loc[a, b]:.3f}"
               for b in names] for a in names]
 
     fig = go.Figure()
@@ -155,7 +155,9 @@ def ranking_table(before, after, cutoff):
     rows = []
     for i, a in enumerate(names):
         for b in names[i + 1:]:
-            rows.append({"Pair": f"{a} - {b}", "Before": r1.loc[a, b], "After": r2.loc[a, b], "Change": diff.loc[a, b], "p-value": p_table.loc[a, b]})
+            rows.append({"Asset 1": a, "Asset 2": b, "Before": r1.loc[a, b],
+                         "After": r2.loc[a, b], "Change": diff.loc[a, b],
+                         "p-value": p_table.loc[a, b]})
     table = pd.DataFrame(rows)
     table["Significant"] = table["p-value"] < cutoff
     return table.sort_values(["Significant", "Change"], ascending=False, 
@@ -189,7 +191,7 @@ def make_rolling_chart(returns, a, b, window, start, end, pair2=None):
                              showlegend=False, hoverinfo="skip"))
     fig.add_trace(go.Scatter(x=rolling.index, y=low, line=dict(width=0), fill="tonexty",
                              fillcolor="rgba(224,168,46,0.18)", name="95% range", hoverinfo="skip"))
-    fig.add_trace(go.Scatter(x=rolling.index, y=rolling, name=f"{a} – {b}",
+    fig.add_trace(go.Scatter(x=rolling.index, y=rolling, name=f"{a} x {b}",
                              line=dict(color=GOLD, width=2), hovertemplate="%{y:+.2f}"))
     if pair2:
         other = rolling_corr(returns, pair2[0], pair2[1], window)
@@ -223,7 +225,7 @@ def make_rolling_chart(returns, a, b, window, start, end, pair2=None):
     fig.update_layout(height=480, hovermode="x unified", margin=dict(l=10, r=10, t=120, b=10),
         paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font=dict(color=LIGHT_TEXT),
         legend=dict(orientation="h", y=1.02, x=1, xanchor="right", yanchor="bottom"),
-        title=dict(x=0.01, text=f"<b>{a} – {b}: {window}-day rolling correlation</b><br>"
+        title=dict(x=0.01, text=f"<b>{a} x {b}: {window}-day rolling correlation</b><br>"
                    f"<span style='font-size:13px;color:{SOFT_TEXT}'>Shaded band = 95% range · "
                    f"dotted/dashed lines = average before / during your period</span>"))
     fig.update_yaxes(range=[-1, 1], title="Correlation (r)", gridcolor="#1C2230",
@@ -261,15 +263,15 @@ def make_animated_heatmap(returns, assets, cutoff):
 
 
 def result_sentence(a, b, r1, r2, p, cutoff, start) -> str:
-    """Write a plain-english summary of the Fisher Test result."""
+    """Summary of the Fisher Test result."""
     direction = "flipped" if np.sign(r1) != np.sign(r2) else "moved"
     p_text = "p < 0.001" if p < 0.001 else f"p = {p:.3f}"
     if p < cutoff:
-        verdict = f"this change is statistically significant ({p_text})"
+        verdict = f"This change is statistically significant ({p_text})."
     else:
-        verdict = f"this change could be chance ({p_text}), so there is no clear sign they decoupled"
-        return (f"**Result:** The {a}-{b} correlation {direction} from {r1:+.2f} before ")
-        f"{start:%b %Y} to {r2:+.2f} in this period; {verdict}."
+        verdict = f"This change could be chance ({p_text}), so there is no clear sign they decoupled."
+    return (f"The {a} x {b} correlation coefficient {direction} from {r1:+.2f} before "
+        f"{start:%b %Y} to {r2:+.2f} in this period. {verdict}")
 
 def set_period(name, first, last):
     """Move the time slider to one of the group's shared periods."""
@@ -285,21 +287,25 @@ def render():
     returns = get_returns().join(load_macro(), how="inner").dropna()
 
     # 1. Controls
-    view = st.radio("View", ["Heatmap", "What changed", "Rolling", "Animated"], horizontal=True, key="p3_view")
+    view = st.radio("View", ["Correlation Heatmap", "What Changed?", "Rolling Graph", "Slideshow", "Ranking Table"], horizontal=True, key="p3_view")
     assets = st.multiselect("Assets", list(returns.columns),
                         default=["Gold", "Silver", "Oil", "S&P 500", "Real yield"],
                         key="p3_assets")
     first, last = returns.index.min().date(), returns.index.max().date()
     if "p3_dates" not in st.session_state:
         st.session_state.p3_dates = (pd.Timestamp(SPLIT).date(), last)
-    st.caption("Quick periods (same as the rest of the dashboard)")
-    for col, name in zip(st.columns(4), ["Before", "Boom", "Crash", "All since 2025"]):
+    st.caption("Quick Period Select")
+    for col, name in zip(st.columns(4), ["Before", "Boom", "Crash", "2025 Onwards"]):
         col.button(name, key=f"p3_btn_{name}", on_click=set_period,
                    args=(name, first, last), width="stretch")
-    start, end = st.slider("Time period", min_value=first, max_value=last,
+    start, end = st.slider("Time Period", min_value=first, max_value=last,
                            format="MMM YYYY", key="p3_dates")
-    cutoff = st.slider("Significance level (p-value cutoff)", min_value=0.01,
+    cutoff = st.slider("Significance Level", min_value=0.01,
                        max_value=0.20, value=0.05, step=0.01, format="%.2f", key="p3_cutoff")
+    for key in ("p3_pair_a", "p3_pair_b"):
+        if key in st.session_state:
+            st.session_state[key] = st.session_state[key]
+    
     a = st.session_state.get("p3_pair_a", assets[0])
     b = st.session_state.get("p3_pair_b", assets[min(2, len(assets) - 1)])
 
@@ -312,12 +318,12 @@ def render():
         return
 
     # 3. Heatmap for the selected period.
-    if view == "Heatmap":
+    if view == "Correlation Heatmap":
         r_table, p_table = correlation_table(period[assets])
         title = f"{start:%b %Y} to {end:%b %Y}"
         st.plotly_chart(make_heatmap(r_table, p_table, cutoff, title, pair=(a,b)), width="stretch")
         st.caption(f"{len(period)} trading days. Blank cells are not significant (p >= {cutoff}).")
-    elif view == "What changed":
+    elif view == "What Changed?":
         before = returns[returns.index < pd.Timestamp(start)]
         if len(before) < 30:
             st.info("Move the start date later so there's a 'before' period to compare against.")
@@ -326,11 +332,11 @@ def render():
             st.plotly_chart(make_change_heatmap(before[assets], period[assets], cutoff, title,
                                             pair=(a, b)), width="stretch")
         st.caption("Blue = the pair moved apart, gold = moved closer. Hover for before/after values.")
-    elif view == "Animated":
+    elif view == "Slideshow":
         st.plotly_chart(make_animated_heatmap(returns, assets, cutoff), width="stretch")
         st.caption("Press play to step through each calendar year. This view uses every year, "
                    "so the time period slider doesn't apply. The year 2026 has only partial data.")
-    else:
+    elif view == "Rolling Graph":
         r1, r2 = st.columns(2)
         ra = r1.selectbox("Rolling pair", assets, index=0, key="p3_roll_a")
         rb = r2.selectbox("against", assets, index=min(1, len(assets) - 1), key="p3_roll_b")
@@ -351,11 +357,13 @@ def render():
         m3.metric("Average in period", f"{during_r:+.2f}", f"{during_r - before_r:+.2f}", delta_color="off")
         m4.metric(f"Lowest ({rolling.idxmin():%b %Y})", f"{rolling.min():+.2f}")
         m5.metric(f"Highest ({rolling.idxmax():%b %Y})", f"{rolling.max():+.2f}")
+    if view != "Ranking Table":
+        return
 
     # 3.5 Ranking every pair by how much it changed, using the fisher test.
     before_all = returns[returns.index < pd.Timestamp(start)]
     if len(before_all) >= 30:
-        with st.expander("Rank every pair: Which relationships changed the most?"):
+        with st.expander("Asset Pairs Ranked by Change", expanded=True):
             table = ranking_table(before_all[assets], period[assets], cutoff)
             st.caption(f"{int(table['Significant'].sum())} of {len(table)} pairs changed "
                        f"significantly (p < {cutoff}).")
@@ -369,7 +377,7 @@ def render():
                                file_name="correlation_changes.csv", key="p3_download")
 
     # 4. Fisher Test: The chosen period vs everything that comes before it.
-    st.markdown("#### Did the relationship change?")
+    st.markdown("#### Pair in Focus: Real Change or Random Noise?")
     pick1, pick2 = st.columns(2)
     a = pick1.selectbox("Compare", assets, index=0, key="p3_pair_a")
     b = pick2.selectbox("with", assets, index=min(2, len(assets) - 1), key="p3_pair_b")
@@ -383,9 +391,9 @@ def render():
     r1, r2 = before[a].corr(before[b]), period[a].corr(period[b])
     z, p = fisher_z_test(r1, len(before), r2, len(period))
     c1, c2, c3 = st.columns(3)
-    c1.metric(f"{a}-{b} before {start:%b %Y}", f"r = {r1:+.2f}")
-    c2.metric(f"{a}-{b} in this period", f"r = {r2:+.2f}")
-    c3.metric("Fisher Z-Test", f"z = {z:.2f}", f"p = {p:.3f}", delta_color="off")
+    c1.metric(f"{a} x {b} before {start:%b %Y}", f"r = {r1:+.2f}")
+    c2.metric(f"{a} x {b} in this period", f"r = {r2:+.2f}", f"{r2 - r1:+.2f}", delta_color="off")
+    c3.metric("p-value", "< 0.001" if p < 0.001 else f"{p:.3f}")
     st.info(result_sentence(a, b, r1, r2, p, cutoff, start))
 
     # 5. Method and Limitations Dropdown box (if needed?, not sure yet but as a test will add.)
