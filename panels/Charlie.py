@@ -52,6 +52,7 @@ standard errors, which assume constant error variance. β̂ is the same either w
 
 **Tests.** Two t-tests for each slope: H0: β = 0 (no link) and H0: β = 1 (one-for-one). The confidence interval is
 β̂ +/- t_crit x SE, at the level chosen on the slider.
+A change in β between two periods is tested with z = (β̂₂ - β̂₁) / √(SE₁² + SE₂²), treating the periods as independent samples.
 
 **Limitations.**
 - The regression shows association, not causation. It describes how silver moved with gold on the same day;
@@ -62,6 +63,7 @@ standard errors, which assume constant error variance. β̂ is the same either w
 - Brent crude and the metals do not close at exactly the same time each day, which can bias daily betas towards zero.
 - Futures prices jump slightly when contracts roll over.
 - R² always rises when a regressor is added, so it should not be compared between Silver vs Gold and Silver vs Gold + Copper.
+- Copper is more volatile than gold, so comparing silver's β on each is a rough guide to precious versus industrial, not a formal test.
 """
 
 @st.cache_data
@@ -472,6 +474,14 @@ def render():
     else:
         st.caption(f"Confidence intervals at the {confidence:.0%} level, assuming constant error variance")
     st.dataframe(by_period.round(3), hide_index = True, width = "stretch")
+
+    st.download_button(
+        "Download results (CSV)",
+        data = by_period.to_csv(index = False).encode("utf-8"),
+        file_name = f"regression_{relationship.replace(' ', '_').lower()}.csv",
+        mime = "text/csv",
+        key = "cha_download",
+    )
 
     with st.expander("What the results mean", expanded = True):
         for i in range(len(by_period)):
