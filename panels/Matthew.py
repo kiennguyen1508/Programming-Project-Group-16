@@ -144,6 +144,19 @@ def make_change_heatmap(before, after, cutoff, title, pair=None):
         "Which assets move together?", "Which relationships changed?"))
     return fig
 
+def ranking_table(before, after, cutoff):
+    """One row per pair, the biggest significant changes first"""
+    diff, p_table, r1, r2 = change_table(before, after)
+    names = list(diff.index)
+    rows = []
+    for i, a in enumerate(names):
+        for b in names[i + 1:]:
+            rows.append({"Pair": f"{a} - {b}", "Before": r1.loc[a, b], "After": r2.loc[a, b], "Change": diff.loc[a, b], "p-value": p_table.loc[a, b]})
+    table = pd.DataFrame(rows)
+    table["Significant"] = table["p-value"] < cutoff
+    return table.sort_values(["Significant", "Change"], ascending=False, 
+                             key=lambda col: col.abs() if col.name == "Change" else col)
+
 def make_rolling_chart(returns: pd.DataFrame, a: str, b: str, window: int, start):
     """Line chart of the correlation between a and b, calculated over a sliding window period"""
     rolling = returns[a].rolling(window).corr(returns[b]).dropna()
@@ -204,9 +217,8 @@ def render():
                            format="MMM YYYY", key="p3_dates")
     cutoff = st.slider("Significance level (p-value cutoff)", min_value=0.01,
                        max_value=0.20, value=0.05, step=0.01, format="%.2f", key="p3_cutoff")
-    pick1, pick2 = st.columns(2)
-    a = pick1.selectbox("Compare", assets, index=0, key="p3_pair_a")
-    b = pick2.selectbox("with", assets, index=min(2, len(assets) - 1), key="p3_pair_b")
+    a = st.session_state.get("p3_pair_a", assets[0])
+    b = st.session_state.get("p3_pair_b", assets[min(2, len(assets) - 1)])
 
                         
 
@@ -242,7 +254,27 @@ def render():
         st.caption(f"Each point is the {a}-{b} correlation over the previous {window} trading days."
                    f"The dotted line marks the start of your chosen period.")
 
+    # 3.5 Ranking every pair by how much it changed, using the fisher test.
+    before_all = returns[returns.index < pd.Timestamp(start)]
+    if len(before_all) >= 30:
+        with st.expander("Rank every pair: Which relationships changed the most?"):
+            table = ranking_table(before_all[assets], period[assets], cutoff)
+            st.caption(f"{int(table['Significant'].sum())} of {len(table)} pairs changed "
+                       f"significantly (p < {cutoff}).")
+            st.dataframe(table, hide_index=True, width="stretch", column_config={
+                "Before": st.column_config.NumberColumn(format="%+.2f"),
+                "After": st.column_config.NumberColumn(format="%+.2f"),
+                "Change": st.column_config.NumberColumn(format="%+.2f"),
+                "p-value": st.column_config.NumberColumn(format="%+.3f"),
+                "Significant": st.column_config.CheckboxColumn("Significant?")})
+            st.download_button("Download as CSV", table.to_csv(index=False),
+                               file_name="correlation_changes.csv", key="p3_download")
+
     # 4. Fisher Test: The chosen period vs everything that comes before it.
+    st.markdown("#### Did the relationship change?")
+    pick1, pick2 = st.columns(2)
+    a = pick1.selectbox("Compare", assets, index=0, key="p3_pair_a")
+    b = pick2.selectbox("with", assets, index=min(2, len(assets) - 1), key="p3_pair_b")
     if a == b:
         st.info("Please select two different assets to run the Fisher Test.")
         return
