@@ -331,13 +331,18 @@ def render():
         st.caption("Press play to step through each calendar year. This view uses every year, "
                    "so the time period slider doesn't apply. The year 2026 has only partial data.")
     else:
+        r1, r2 = st.columns(2)
+        ra = r1.selectbox("Rolling pair", assets, index=0, key="p3_roll_a")
+        rb = r2.selectbox("against", assets, index=min(1, len(assets) - 1), key="p3_roll_b")
+        if ra == rb:
+            st.info("Pick two different assets for the rolling chart.")
         c1, c2 = st.columns(2)
         window = c1.slider("Rolling window (trading days)", 30, 250, 90, step=10, key="p3_window")
         pairs = [f"{x} vs {y}" for i, x in enumerate(assets) for y in assets[i + 1:]]
         extra = c2.selectbox("Also compare (optional)", ["None"] + pairs, key="p3_pair2")
         pair2 = None if extra == "None" else extra.split(" vs ")
-        st.plotly_chart(make_rolling_chart(returns, a, b, window, start, end, pair2), width="stretch")
-        rolling = rolling_corr(returns, a, b, window)
+        st.plotly_chart(make_rolling_chart(returns, ra, rb, window, start, end, pair2), width="stretch")
+        rolling = rolling_corr(returns, ra, rb, window)
         before_r = rolling[rolling.index < pd.Timestamp(start)].mean()
         during_r = rolling[(rolling.index >= pd.Timestamp(start)) & (rolling.index <= pd.Timestamp(end))].mean()
         m1, m2, m3, m4, m5 = st.columns(5)
