@@ -509,14 +509,14 @@ def render():
         key = "cha_download",
     )
 
+    st.info(answer(by_period, relationship, confidence))
+
     with st.expander("What the results mean", expanded = True):
         for i in range(len(by_period)):
             st.markdown(describe(by_period.iloc[i], y_name, regressors, confidence, one_for_one))
         for name in regressors:
             for line in compare(by_period, y_name, name, confidence):
                 st.markdown(line)
-
-    st.info(answer(by_period, relationship, confidence))
 
     with st.expander("Method and limitations"):
         st.markdown(METHOD_NOTES)
