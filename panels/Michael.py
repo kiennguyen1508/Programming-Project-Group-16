@@ -19,6 +19,7 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 from scipy import stats
 from scipy.stats import gaussian_kde
 
@@ -30,6 +31,7 @@ except ImportError:
     yf = None
 
 SPLIT_DATE = pd.Timestamp("2025-01-01")
+YEAR_2026_START = pd.Timestamp("2026-01-01")
 TRADING_DAYS = 252
 
 ASSET_ORDER = ["Gold", "Silver", "Copper", "Oil", "S&P 500"]
@@ -91,7 +93,7 @@ dividends. These historical patterns do not predict future returns.
 """
 
 
-@st.cache_data(show_spinner=False)
+@st.cache_data(show_spinner=False, max_entries=10)
 def load_shared_data():
     returns = get_returns().copy()
     macro = get_macro().copy()
@@ -111,10 +113,10 @@ def load_shared_data():
 
     returns = returns.apply(pd.to_numeric, errors="coerce")
     returns = returns.replace([np.inf, -np.inf], np.nan)
-    return returns, macro
+    return returns
 
 
-@st.cache_data(ttl=86400, show_spinner=False)
+@st.cache_data(ttl=86400, show_spinner=False, max_entries=500)
 def download_one_volume_series(symbol, start_date, end_date):
     """Download daily volume from Yahoo Finance; return an empty series on failure."""
     if yf is None:
@@ -137,7 +139,7 @@ def download_one_volume_series(symbol, start_date, end_date):
         return pd.Series(dtype=float, name=symbol)
 
 
-@st.cache_data(ttl=86400, show_spinner=False)
+@st.cache_data(ttl=86400, show_spinner=False, max_entries=20)
 def load_volume_data(start_date, end_date):
     """Use futures volume where available; otherwise a labelled ETF proxy."""
     series_by_asset = {}
@@ -174,14 +176,12 @@ def period_slice(data, period):
     if period == "2015–2024":
         return data.loc[data.index < SPLIT_DATE]
     if period == "2025":
-        return data.loc[(data.index >= SPLIT_DATE) & (data.index < pd.Timestamp("2026-01-01"))]
+        return data.loc[(data.index >= SPLIT_DATE) & (data.index < YEAR_2026_START)]
     if period == "2026 YTD":
-        return data.loc[data.index >= pd.Timestamp("2026-01-01")]
+        return data.loc[data.index >= YEAR_2026_START]
     if period == "Since 2025":
         return data.loc[data.index >= SPLIT_DATE]
     return data.iloc[0:0]
-
-
 
 def make_volcano_3d(returns, volumes, distribution_specs, bandwidth=1.0):
     """
@@ -218,7 +218,6 @@ def make_volcano_3d(returns, volumes, distribution_specs, bandwidth=1.0):
     y_grid = np.linspace(0, 100, 70)
     xx, yy = np.meshgrid(x_grid, y_grid)
 
-    from plotly.subplots import make_subplots
     fig = make_subplots(
         rows=1,
         cols=len(pairs),
@@ -227,6 +226,7 @@ def make_volcano_3d(returns, volumes, distribution_specs, bandwidth=1.0):
         horizontal_spacing=0.04,
     )
 
+    surfaces_added = 0
     for col, (asset, period, data) in enumerate(pairs, start=1):
         observations = data[["return", "volume_percentile"]].to_numpy(dtype=float)
         observations[:, 0] *= 100
@@ -248,6 +248,7 @@ def make_volcano_3d(returns, volumes, distribution_specs, bandwidth=1.0):
         except (np.linalg.LinAlgError, ValueError):
             continue
 
+        surfaces_added += 1
         label = f"{asset} · {period}"
         fig.add_trace(
             go.Surface(
@@ -282,6 +283,9 @@ def make_volcano_3d(returns, volumes, distribution_specs, bandwidth=1.0):
             row=1,
             col=col,
         )
+
+    if surfaces_added == 0:
+        return None, "The joint distributions could not be estimated from the available observations."
 
     fig.update_layout(
         title=dict(
@@ -358,18 +362,39 @@ def risk_table(returns, assets, periods):
 def make_rolling_volatility(returns, assets, window=30):
     fig = go.Figure()
     for asset in assets:
-        rolling = returns[asset].rolling(window, min_periods=max(15, window // 2)).std() * np.sqrt(TRADING_DAYS) * 100
-        fig.add_trace(go.Scatter(
-            x=rolling.index, y=rolling, mode="lines", name=asset,
-            line=dict(color=ASSET_COLOURS.get(asset, "#A0AAB8"), width=2)
-        ))
-    fig.add_vline(x=SPLIT_DATE, line_dash="dash", line_color="#E0B252",
-                  annotation_text="Start of 2025")
+        rolling = (
+            returns[asset]
+            .rolling(window, min_periods=max(15, window // 2))
+            .std()
+            * np.sqrt(TRADING_DAYS)
+            * 100
+        )
+        fig.add_trace(
+            go.Scatter(
+                x=rolling.index,
+                y=rolling,
+                mode="lines",
+                name=asset,
+                line=dict(
+                    color=ASSET_COLOURS.get(asset, "#A0AAB8"),
+                    width=2,
+                ),
+            )
+        )
+    fig.add_vline(
+        x=SPLIT_DATE,
+        line_dash="dash",
+        line_color="#E0B252",
+        annotation_text="Start of 2025",
+    )
     fig.update_layout(
         title=f"{window}-day rolling annualised volatility",
-        height=380, xaxis_title=None, yaxis_title="Annualised volatility (%)",
-        hovermode="x unified", legend=dict(orientation="h", y=1.12),
-        margin=dict(l=10, r=10, t=60, b=10)
+        height=380,
+        xaxis_title=None,
+        yaxis_title="Annualised volatility (%)",
+        hovermode="x unified",
+        legend=dict(orientation="h", y=1.12),
+        margin=dict(l=10, r=10, t=60, b=10),
     )
     return fig
 
@@ -417,7 +442,7 @@ def render():
     )
 
     try:
-        returns, macro = load_shared_data()
+        returns = load_shared_data()
     except Exception as exc:
         st.error(f"Could not load shared project data: {exc}")
         return
@@ -605,7 +630,7 @@ def render():
 def overview():
     """Small dashboard landing-page preview."""
     try:
-        returns, _ = load_shared_data()
+        returns = load_shared_data()
     except Exception:
         st.caption("Distribution & Risk preview unavailable.")
         return
