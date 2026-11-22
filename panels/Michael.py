@@ -307,3 +307,552 @@ def calculate_summary(data):
     }, index=["Gold", "S&P 500"])
 
     return summary
+
+# --------------------------------------------------
+# CHUNK 7: FILTER THE DATA
+# --------------------------------------------------
+
+def filter_data(data, period, condition):
+
+    filtered = data.copy()
+
+    # filter by time period
+    if period != "All data":
+        filtered = filtered[
+            filtered["Period"] == period
+        ]
+
+    # filter by market condition
+    if condition != "All conditions":
+
+        if condition == "High real rates":
+            filtered = filtered[
+                filtered["Rate regime"] == "High real rates"
+            ]
+
+        elif condition == "Low real rates":
+            filtered = filtered[
+                filtered["Rate regime"] == "Low real rates"
+            ]
+
+        elif condition == "High gold volatility":
+            filtered = filtered[
+                filtered["Gold volatility"] == "High gold volatility"
+            ]
+
+        elif condition == "Low gold volatility":
+            filtered = filtered[
+                filtered["Gold volatility"] == "Low gold volatility"
+            ]
+
+        elif condition == "High equity tail risk":
+            filtered = filtered[
+                filtered["Equity tail risk"] == "High equity tail risk"
+            ]
+
+        elif condition == "Low equity tail risk":
+            filtered = filtered[
+                filtered["Equity tail risk"] == "Low equity tail risk"
+            ]
+
+    return filtered
+
+
+# --------------------------------------------------
+# CHUNK 8: CREATE THE SUPPORTING GRAPHS
+# --------------------------------------------------
+
+def create_contour_plot(data):
+
+    gold = data["Gold"].to_numpy() * 100
+    sp500 = data["S&P 500"].to_numpy() * 100
+
+    values = np.vstack([gold, sp500])
+    kde = gaussian_kde(values)
+
+    gold_grid = np.linspace(gold.min(), gold.max(), 60)
+    sp500_grid = np.linspace(sp500.min(), sp500.max(), 60)
+
+    X, Y = np.meshgrid(gold_grid, sp500_grid)
+
+    positions = np.vstack([X.ravel(), Y.ravel()])
+    Z = kde(positions).reshape(X.shape)
+
+    figure = go.Figure(
+        data=[
+            go.Contour(
+                x=gold_grid,
+                y=sp500_grid,
+                z=Z,
+                colorscale="Viridis",
+                contours=dict(
+                    coloring="heatmap",
+                    showlabels=True
+                )
+            )
+        ]
+    )
+
+    figure.update_layout(
+        title="Gold and S&P 500 Return Density",
+        xaxis_title="Gold daily return (%)",
+        yaxis_title="S&P 500 daily return (%)",
+        height=500
+    )
+
+    return figure
+
+
+def create_rolling_correlation(data, window):
+
+    rolling_corr = data["Gold"].rolling(
+        window=window
+    ).corr(data["S&P 500"])
+
+    figure = go.Figure()
+
+    figure.add_trace(
+        go.Scatter(
+            x=rolling_corr.index,
+            y=rolling_corr,
+            mode="lines",
+            name="Rolling correlation",
+            line=dict(width=2)
+        )
+    )
+
+    figure.add_hline(
+        y=0,
+        line_dash="dash",
+        line_color="grey"
+    )
+
+    figure.update_layout(
+        title=f"Gold and S&P 500 Rolling Correlation ({window} days)",
+        xaxis_title="Date",
+        yaxis_title="Correlation",
+        yaxis=dict(range=[-1, 1]),
+        height=450
+    )
+
+    return figure
+
+
+def create_return_distribution(data):
+
+    figure = go.Figure()
+
+    figure.add_trace(
+        go.Histogram(
+            x=data["Gold"] * 100,
+            name="Gold",
+            histnorm="probability density",
+            opacity=0.65,
+            nbinsx=60
+        )
+    )
+
+    figure.add_trace(
+        go.Histogram(
+            x=data["S&P 500"] * 100,
+            name="S&P 500",
+            histnorm="probability density",
+            opacity=0.65,
+            nbinsx=60
+        )
+    )
+
+    figure.update_layout(
+        title="Daily Return Distributions",
+        xaxis_title="Daily return (%)",
+        yaxis_title="Density",
+        barmode="overlay",
+        height=450
+    )
+
+    return figure
+
+
+# --------------------------------------------------
+# CHUNK 9: DASHBOARD LAYOUT AND INTERACTIVE CONTROLS
+# --------------------------------------------------
+
+st.set_page_config(
+    page_title="Gold and Equity Market Analysis",
+    page_icon="📊",
+    layout="wide"
+)
+
+st.title("Gold and Equity Market Analysis")
+
+st.markdown(
+    """
+    ### Has the relationship between Gold and the S&P 500 changed since 2025?
+
+    Explore how asset returns behave under different economic
+    and financial market conditions.
+    """
+)
+
+# load and prepare the data
+try:
+    analysis_data = prepare_analysis()
+
+except Exception as error:
+    st.error(
+        "The data could not be loaded. Check your internet connection, "
+        "data sources and data_loader.py."
+    )
+    st.exception(error)
+    st.stop()
+
+
+# sidebar controls
+st.sidebar.title("Dashboard Controls")
+
+period_choice = st.sidebar.selectbox(
+    "Select time period",
+    [
+        "All data",
+        "Before 2025",
+        "2025 onwards"
+    ]
+)
+
+condition_choice = st.sidebar.selectbox(
+    "Select market condition",
+    [
+        "All conditions",
+        "High real rates",
+        "Low real rates",
+        "High gold volatility",
+        "Low gold volatility",
+        "High equity tail risk",
+        "Low equity tail risk"
+    ]
+)
+
+rolling_window = st.sidebar.select_slider(
+    "Rolling correlation window",
+    options=[30, 60, 90, 180, 252],
+    value=90
+)
+
+# apply the filters
+selected_data = filter_data(
+    analysis_data,
+    period_choice,
+    condition_choice
+)
+
+st.sidebar.markdown("---")
+
+st.sidebar.write(
+    f"Observations selected: {len(selected_data):,}"
+)
+
+
+# check that enough observations are available
+if len(selected_data) < 10:
+
+    st.warning(
+        "There are not enough observations for this selection. "
+        "Try changing the filters."
+    )
+    st.stop()
+
+
+# --------------------------------------------------
+# CHUNK 10: DISPLAY THE GRAPHS AND RESULTS
+# --------------------------------------------------
+
+# calculate the main statistics
+correlation = calculate_correlation(selected_data)
+
+gold_average = selected_data["Gold"].mean() * 100
+sp500_average = selected_data["S&P 500"].mean() * 100
+
+gold_volatility = selected_data["Gold"].std() * 100
+sp500_volatility = selected_data["S&P 500"].std() * 100
+
+
+# KPI cards
+st.subheader("Market Overview")
+
+col1, col2, col3, col4 = st.columns(4)
+
+col1.metric(
+    "Gold–S&P Correlation",
+    f"{correlation:.3f}"
+)
+
+col2.metric(
+    "Gold Average Daily Return",
+    f"{gold_average:.3f}%"
+)
+
+col3.metric(
+    "S&P 500 Average Daily Return",
+    f"{sp500_average:.3f}%"
+)
+
+col4.metric(
+    "Observations",
+    f"{len(selected_data):,}"
+)
+
+
+st.markdown("---")
+
+
+# main 3D graph
+st.subheader("1. Joint Probability Density")
+
+st.write(
+    """
+    This graph estimates how frequently different combinations
+    of Gold and S&P 500 daily returns occur.
+    """
+)
+
+try:
+
+    main_figure = create_3d_surface(
+        selected_data,
+        "Gold and S&P 500 Joint Probability Density"
+    )
+
+    st.plotly_chart(
+        main_figure,
+        use_container_width=True
+    )
+
+except Exception as error:
+
+    st.warning(
+        "The 3D density graph could not be calculated for this selection."
+    )
+    st.caption(str(error))
+
+
+st.markdown("---")
+
+
+# compare the two time periods
+st.subheader("2. Before and After 2025")
+
+st.write(
+    """
+    Compare the joint return distributions in the two periods
+    to investigate whether the relationship between the assets changed.
+    """
+)
+
+before_data = analysis_data[
+    analysis_data["Period"] == "Before 2025"
+]
+
+after_data = analysis_data[
+    analysis_data["Period"] == "2025 onwards"
+]
+
+comparison_col1, comparison_col2 = st.columns(2)
+
+with comparison_col1:
+
+    st.markdown("**Before 2025**")
+
+    if len(before_data) >= 10:
+
+        try:
+
+            before_figure = create_3d_surface(
+                before_data,
+                "Before 2025"
+            )
+
+            st.plotly_chart(
+                before_figure,
+                use_container_width=True
+            )
+
+        except Exception:
+
+            st.warning(
+                "The pre-2025 density graph could not be calculated."
+            )
+
+    else:
+
+        st.warning("Not enough pre-2025 observations.")
+
+
+with comparison_col2:
+
+    st.markdown("**2025 onwards**")
+
+    if len(after_data) >= 10:
+
+        try:
+
+            after_figure = create_3d_surface(
+                after_data,
+                "2025 onwards"
+            )
+
+            st.plotly_chart(
+                after_figure,
+                use_container_width=True
+            )
+
+        except Exception:
+
+            st.warning(
+                "The post-2025 density graph could not be calculated."
+            )
+
+    else:
+
+        st.warning("Not enough post-2025 observations.")
+
+
+# correlation comparison
+st.subheader("Correlation Comparison")
+
+comparison_results = []
+
+for period_name, period_data in [
+    ("Before 2025", before_data),
+    ("2025 onwards", after_data)
+]:
+
+    if len(period_data) >= 2:
+
+        comparison_results.append({
+            "Period": period_name,
+            "Correlation": period_data["Gold"].corr(
+                period_data["S&P 500"]
+            ),
+            "Gold volatility (%)": period_data["Gold"].std() * 100,
+            "S&P 500 volatility (%)": period_data["S&P 500"].std() * 100,
+            "Observations": len(period_data)
+        })
+
+comparison_table = pd.DataFrame(comparison_results)
+
+st.dataframe(
+    comparison_table,
+    use_container_width=True,
+    hide_index=True
+)
+
+
+st.markdown("---")
+
+
+# 2D density contour graph
+st.subheader("3. Two-Dimensional Density Contours")
+
+st.write(
+    """
+    The contour graph provides another way to see where combinations
+    of Gold and S&P 500 returns are concentrated.
+    """
+)
+
+try:
+
+    contour_figure = create_contour_plot(selected_data)
+
+    st.plotly_chart(
+        contour_figure,
+        use_container_width=True
+    )
+
+except Exception as error:
+
+    st.warning(
+        "The density contour graph could not be calculated."
+    )
+    st.caption(str(error))
+
+
+st.markdown("---")
+
+
+# rolling correlation graph
+st.subheader("4. Rolling Correlation")
+
+st.write(
+    """
+    This graph tracks how the relationship between Gold and the
+    S&P 500 changes over time.
+    """
+)
+
+rolling_figure = create_rolling_correlation(
+    analysis_data,
+    rolling_window
+)
+
+st.plotly_chart(
+    rolling_figure,
+    use_container_width=True
+)
+
+
+st.markdown("---")
+
+
+# return distribution graph
+st.subheader("5. Daily Return Distributions")
+
+st.write(
+    """
+    Compare the distribution of daily Gold and S&P 500 returns.
+    """
+)
+
+distribution_figure = create_return_distribution(
+    selected_data
+)
+
+st.plotly_chart(
+    distribution_figure,
+    use_container_width=True
+)
+
+
+st.markdown("---")
+
+
+# summary statistics
+st.subheader("6. Summary Statistics")
+
+summary_table = calculate_summary(selected_data)
+
+st.dataframe(
+    summary_table,
+    use_container_width=True
+)
+
+
+# display the underlying data
+with st.expander("View underlying dataset"):
+
+    st.dataframe(
+        selected_data,
+        use_container_width=True
+    )
+
+
+# project information
+st.markdown("---")
+
+st.caption(
+    """
+    Data sources: Yahoo Finance, Federal Reserve Economic Data (FRED)
+    and CBOE. Daily returns are calculated from historical prices.
+    Market regimes are classified using the median of the available sample.
+    """
+)
