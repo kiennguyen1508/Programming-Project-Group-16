@@ -122,6 +122,28 @@ def fisher_z_test(r1: float, n1: int, r2: float, n2: int) -> tuple:
     p = 2 * (1 - stats.norm.cdf(abs(z)))
     return z, p
 
+def change_table(before, after):
+    """How much each pair's correlation changed, and whether that change is significant."""
+    r1 = before.corr().clip(-0.999, 0.999)
+    r2 = after.corr().clip(-0.999, 0.999)
+    z, p = fisher_z_test(r1, len(before), r2, len(after))
+    p_table = pd.DataFrame(p, index=r1.index, columns=r1.columns)
+    return r2 - r1, p_table, r1, r2
+
+def make_change_heatmap(before, after, cutoff, title, pair=None):
+    diff, p_table, r1, r2 = change_table(before, after)
+    names = list(diff.index)
+    hover = [[f"<b>{a} × {b}</b><br>before: {r1.loc[a, b]:+.2f}<br>after: {r2.loc[a, b]:+.2f}"
+              f"<br>change: {diff.loc[a, b]:+.2f} (p = {p_table.loc[a, b]:.3f})"
+              for b in names] for a in names]
+    fig = make_heatmap(diff, p_table, cutoff, title, pair)
+    fig.data[1].update(zmin=-0.5, zmax=0.5, customdata=hover)
+    fig.data[1].colorbar.update(tickvals=[-0.5, 0, 0.5],
+                                ticktext=["moved apart", "no change", "moved closer"])
+    fig.update_layout(title_text=fig.layout.title.text.replace(
+        "Which assets move together?", "Which relationships changed?"))
+    return fig
+
 def make_rolling_chart(returns: pd.DataFrame, a: str, b: str, window: int, start):
     """Line chart of the correlation between a and b, calculated over a sliding window period"""
     rolling = returns[a].rolling(window).corr(returns[b]).dropna()
@@ -172,7 +194,7 @@ def render():
     returns = get_returns().join(load_macro(), how="inner").dropna()
 
     # 1. Controls
-    view = st.radio("View", ["Heatmap", "Rolling", "Animated"], horizontal=True, key="p3_view")
+    view = st.radio("View", ["Heatmap", "What changed", "Rolling", "Animated"], horizontal=True, key="p3_view")
     assets = st.multiselect("Assets", list(returns.columns),
                         default=["Gold", "Silver", "Oil", "S&P 500", "Real yield"],
                         key="p3_assets")
@@ -200,6 +222,15 @@ def render():
         title = f"{start:%b %Y} to {end:%b %Y}"
         st.plotly_chart(make_heatmap(r_table, p_table, cutoff, title, pair=(a,b)), width="stretch")
         st.caption(f"{len(period)} trading days. Blank cells are not significant (p >= {cutoff}).")
+    elif view == "What changed":
+        before = returns[returns.index < pd.Timestamp(start)]
+        if len(before) < 30:
+            st.info("Move the start date later so there's a 'before' period to compare against.")
+        else:
+            title = f"Before {start:%b %Y} vs {start:%b %Y} to {end:%b %Y}"
+            st.plotly_chart(make_change_heatmap(before[assets], period[assets], cutoff, title,
+                                            pair=(a, b)), width="stretch")
+        st.caption("Blue = the pair moved apart, gold = moved closer. Hover for before/after values.")
     elif view == "Animated":
         st.plotly_chart(make_animated_heatmap(returns, assets, cutoff), width="stretch")
         st.caption("Press play to step through each calendar year. This view uses every year, "
