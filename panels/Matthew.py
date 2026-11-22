@@ -17,6 +17,9 @@ GOLD_BLUE = [[0, "#2E6FD8"], [0.5, "#1C2230"], [1, "#E0A82E"]]
 NS_GREY = "#161B26"
 LIGHT_TEXT = "#E6E9EF"
 SOFT_TEXT = "#9AA4B8"
+GOLD, BLUE = "#E0A82E", "#2E6FD8"
+EVENTS = [("COVID crash", "2020-02-20", "2020-04-30"),
+          ("Ukraine war &<br>rate hikes", "2022-02-24", "2022-10-31")]
 
 
 def split_periods(returns: pd.DataFrame, assets: list) -> tuple:
@@ -166,14 +169,67 @@ def fade_ns(row):
     """Grey out every cell in rows that aren't significant."""
     return ["color: #6B7280" if not row["Significant"] else ""] * len(row)
 
-def make_rolling_chart(returns: pd.DataFrame, a: str, b: str, window: int, start):
-    """Line chart of the correlation between a and b, calculated over a sliding window period"""
-    rolling = returns[a].rolling(window).corr(returns[b]).dropna()
-    fig = go.Figure(go.Scatter(x=rolling.index, y=rolling, mode="lines", name=f"{a}-{b}"))
-    fig.add_hline(y=0, line_dash="dash", line_color="grey")
-    fig.add_vline(x=pd.Timestamp(start), line_dash="dot", line_color="orange")
-    fig.update_layout(title=f"{a}-{b}: {window}-day rolling correlation",
-                      yaxis_title="Correlation (r)", yaxis_range=[-1,1])
+def rolling_corr(returns, a, b, window):
+    """Correlation of a and b over the previous `window` trading days, day by day."""
+    return returns[a].rolling(window).corr(returns[b]).dropna()
+
+def confidence_band(rolling, window):
+    """95% range for each rolling r, using the Fisher z trick."""
+    z = np.arctanh(rolling.clip(-0.999, 0.999))
+    se = 1 / np.sqrt(window - 3)
+    return np.tanh(z - 1.96 * se), np.tanh(z + 1.96 * se)
+
+def make_rolling_chart(returns, a, b, window, start, end, pair2=None):
+    # (a) the band and the line(s)
+    rolling = rolling_corr(returns, a, b, window)
+    low, high = confidence_band(rolling, window)
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=rolling.index, y=high, line=dict(width=0),
+                             showlegend=False, hoverinfo="skip"))
+    fig.add_trace(go.Scatter(x=rolling.index, y=low, line=dict(width=0), fill="tonexty",
+                             fillcolor="rgba(224,168,46,0.18)", name="95% range", hoverinfo="skip"))
+    fig.add_trace(go.Scatter(x=rolling.index, y=rolling, name=f"{a} – {b}",
+                             line=dict(color=GOLD, width=2), hovertemplate="%{y:+.2f}"))
+    if pair2:
+        other = rolling_corr(returns, pair2[0], pair2[1], window)
+        fig.add_trace(go.Scatter(x=other.index, y=other, name=f"{pair2[0]} – {pair2[1]}",
+                                 line=dict(color=BLUE, width=2), hovertemplate="%{y:+.2f}"))
+
+    # (b) shaded events and your period
+    start, end = pd.Timestamp(start), pd.Timestamp(end)
+    for label, s, e in EVENTS:
+        fig.add_vrect(x0=s, x1=e, fillcolor="rgba(255,255,255,0.06)", line_width=0,
+                      annotation_text=label, annotation_position="bottom left",
+                      annotation_font=dict(color=SOFT_TEXT, size=10))
+    fig.add_vrect(x0=start, x1=end, fillcolor="rgba(224,168,46,0.07)", line_width=0,
+                  annotation_text="Your period", annotation_position="top right",
+                  annotation_font=dict(color=GOLD, size=11))
+
+    # (c) average before vs during, plus the zero line
+    before = rolling[rolling.index < start]
+    during = rolling[(rolling.index >= start) & (rolling.index <= end)]
+    for part, dash in [(before, "dot"), (during, "dash")]:
+        if len(part):
+            fig.add_shape(type="line", x0=part.index[0], x1=part.index[-1], y0=part.mean(),
+                          y1=part.mean(), line=dict(color=LIGHT_TEXT, width=1.5, dash=dash))
+    fig.add_hline(y=0, line_color="#4A5368", line_width=1)
+
+    # (d) styling, zoom buttons and range slider
+    fig.update_layout(height=480, hovermode="x unified", margin=dict(l=10, r=10, t=120, b=10),
+        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font=dict(color=LIGHT_TEXT),
+        legend=dict(orientation="h", y=1.02, x=1, xanchor="right", yanchor="bottom"),
+        title=dict(x=0.01, text=f"<b>{a} – {b}: {window}-day rolling correlation</b><br>"
+                   f"<span style='font-size:13px;color:{SOFT_TEXT}'>Shaded band = 95% range · "
+                   f"dotted/dashed lines = average before / during your period</span>"))
+    fig.update_yaxes(range=[-1, 1], title="Correlation (r)", gridcolor="#1C2230",
+                     zeroline=False, automargin=True)
+    fig.update_xaxes(gridcolor="#1C2230", rangeslider=dict(visible=True, thickness=0.06),
+        rangeselector=dict(x=0, y=1.02, yanchor="bottom", bgcolor="#1C2230",
+            activecolor="#2B3140", font=dict(color=LIGHT_TEXT),
+            buttons=[dict(count=1, label="1Y", step="year", stepmode="backward"),
+                     dict(count=3, label="3Y", step="year", stepmode="backward"),
+                     dict(count=5, label="5Y", step="year", stepmode="backward"),
+                     dict(step="all", label="All")]))
     return fig
 
 def make_animated_heatmap(returns, assets, cutoff):
@@ -257,11 +313,21 @@ def render():
         st.caption("Press play to step through each calendar year. This view uses every year, "
                    "so the time period slider doesn't apply. The year 2026 has only partial data.")
     else:
-        window = st.slider("Rolling Window (trading days)", min_value=30, max_value=250,
-                           value=90, step=10, key="p3_window")
-        st.plotly_chart(make_rolling_chart(returns, a, b, window, start))
-        st.caption(f"Each point is the {a}-{b} correlation over the previous {window} trading days."
-                   f"The dotted line marks the start of your chosen period.")
+        c1, c2 = st.columns(2)
+        window = c1.slider("Rolling window (trading days)", 30, 250, 90, step=10, key="p3_window")
+        pairs = [f"{x} vs {y}" for i, x in enumerate(assets) for y in assets[i + 1:]]
+        extra = c2.selectbox("Also compare (optional)", ["None"] + pairs, key="p3_pair2")
+        pair2 = None if extra == "None" else extra.split(" vs ")
+        st.plotly_chart(make_rolling_chart(returns, a, b, window, start, end, pair2), width="stretch")
+        rolling = rolling_corr(returns, a, b, window)
+        before_r = rolling[rolling.index < pd.Timestamp(start)].mean()
+        during_r = rolling[(rolling.index >= pd.Timestamp(start)) & (rolling.index <= pd.Timestamp(end))].mean()
+        m1, m2, m3, m4, m5 = st.columns(5)
+        m1.metric("Latest", f"{rolling.iloc[-1]:+.2f}")
+        m2.metric("Average before", f"{before_r:+.2f}")
+        m3.metric("Average in period", f"{during_r:+.2f}", f"{during_r - before_r:+.2f}", delta_color="off")
+        m4.metric(f"Lowest ({rolling.idxmin():%b %Y})", f"{rolling.min():+.2f}")
+        m5.metric(f"Highest ({rolling.idxmax():%b %Y})", f"{rolling.max():+.2f}")
 
     # 3.5 Ranking every pair by how much it changed, using the fisher test.
     before_all = returns[returns.index < pd.Timestamp(start)]
