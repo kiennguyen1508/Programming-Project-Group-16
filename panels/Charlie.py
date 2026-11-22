@@ -80,6 +80,17 @@ def load_returns():
     return returns.join(copper)
 
 
+@st.cache_data
+def silver_story():
+    """
+    How far silver rose from the start of 2025 to its peak, and how far it has fallen since.
+    """
+    silver = get_prices("2025-01-01")["Silver"]
+    rise = silver.loc[SILVER_PEAK] / silver.iloc[0] - 1
+    fall = silver.iloc[-1] / silver.loc[SILVER_PEAK] - 1
+    return rise, fall
+
+
 def run_ols(y, x, alpha_level=0.05, robust=True):
     """
     OLS by matrix formula, with White robust or ordinary standard errors.
@@ -414,6 +425,9 @@ def render():
     """
     st.subheader("Regression analysis: silver, oil and gold")
     st.caption("By Charlie O'Sullivan | Data: Yahoo Finance daily prices")
+    rise, fall = silver_story()
+    st.caption(f"Silver rose {rise:.0%} from the start of 2025 to its peak on {SILVER_PEAK:%d %b %Y}, "
+               f"then fell {abs(fall):.0%}.")
 
     returns = load_returns()
 
@@ -440,12 +454,14 @@ def render():
             options = [0.90, 0.95, 0.99],
             value = 0.95,
             format_func = lambda c: f"{c:.0%}",
+            help = "How sure we want to be before calling a result significant. Higher means a wider confidence interval.",
             key = "cha_conf",
         )
     with col_robust:
         robust = st.toggle(
             "Robust standard errors (White)",
             value = True,
+            help = "Allows for some days being much more volatile than others. It widens the confidence intervals; β does not change.",
             key = "cha_robust",
         )
 
@@ -500,6 +516,8 @@ def render():
     else:
         st.caption(f"Confidence intervals at the {confidence:.0%} level, assuming constant error variance")
     st.dataframe(by_period.round(3), hide_index = True, width = "stretch")
+    st.caption("Beta is the average move. CI low to CI high is the confidence interval, a range of plausible values for β. "
+               "n is the number of trading days.")
 
     st.download_button(
         "Download results (CSV)",
