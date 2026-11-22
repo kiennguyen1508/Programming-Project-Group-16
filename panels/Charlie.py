@@ -385,9 +385,13 @@ def answer(by_period, relationship, confidence):
                 f"{gold_bigger} of {n_periods} periods.")
 
     else:
-        clear = (gold["CI low"] > 0).sum() + (gold["CI high"] < 0).sum()
+        positive = (gold["CI low"] > 0).sum()
+        negative = (gold["CI high"] < 0).sum()
+        clear = positive + negative
         if clear == 0:
             headline = "No clear link."
+        elif positive > 0 and negative > 0:
+            headline = "Yes, but not in the same direction."
         elif clear < n_periods:
             headline = "Only sometimes."
         else:
