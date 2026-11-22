@@ -20,6 +20,7 @@ SOFT_TEXT = "#9AA4B8"
 GOLD, BLUE = "#E0A82E", "#2E6FD8"
 EVENTS = [("COVID crash", "2020-02-20", "2020-04-30"),
           ("Ukraine war &<br>rate hikes", "2022-02-24", "2022-10-31")]
+SILVER_PEAK = pd.Timestamp("2026-01-26")
 
 
 def split_periods(returns: pd.DataFrame, assets: list) -> tuple:
@@ -205,6 +206,10 @@ def make_rolling_chart(returns, a, b, window, start, end, pair2=None):
                   annotation_text="Your period", annotation_position="top right",
                   annotation_font=dict(color=GOLD, size=11))
 
+    fig.add_vline(x=SILVER_PEAK, line_dash="dot", line_color="#C0C6D0", line_width=1.5)
+    fig.add_annotation(x=SILVER_PEAK, y=-0.95, text="Silver peak", showarrow=False,
+                       xanchor="right", font=dict(color=SOFT_TEXT, size=10))
+
     # (c) average before vs during, plus the zero line
     before = rolling[rolling.index < start]
     during = rolling[(rolling.index >= start) & (rolling.index <= end)]
@@ -266,6 +271,14 @@ def result_sentence(a, b, r1, r2, p, cutoff, start) -> str:
         return (f"**Result:** The {a}-{b} correlation {direction} from {r1:+.2f} before ")
         f"{start:%b %Y} to {r2:+.2f} in this period; {verdict}."
 
+def set_period(name, first, last):
+    """Move the time slider to one of the group's shared periods."""
+    split, peak = pd.Timestamp(SPLIT).date(), SILVER_PEAK.date()
+    one_day = pd.Timedelta(days=1)
+    periods = {"Before": (first, split - one_day), "Boom": (split, peak),
+               "Crash": (peak + one_day, last), "All since 2025": (split, last)}
+    st.session_state.p3_dates = periods[name]
+
 def render():
     """Draw Panel 3 on the dashboard"""
     st.subheader("Correlation Heatmap")
@@ -277,8 +290,13 @@ def render():
                         default=["Gold", "Silver", "Oil", "S&P 500", "Real yield"],
                         key="p3_assets")
     first, last = returns.index.min().date(), returns.index.max().date()
-    start, end = st.slider("Time Period", min_value=first, max_value=last,
-                           value=(pd.Timestamp(SPLIT).date(), last),
+    if "p3_dates" not in st.session_state:
+        st.session_state.p3_dates = (pd.Timestamp(SPLIT).date(), last)
+    st.caption("Quick periods (same as the rest of the dashboard)")
+    for col, name in zip(st.columns(4), ["Before", "Boom", "Crash", "All since 2025"]):
+        col.button(name, key=f"p3_btn_{name}", on_click=set_period,
+                   args=(name, first, last), width="stretch")
+    start, end = st.slider("Time period", min_value=first, max_value=last,
                            format="MMM YYYY", key="p3_dates")
     cutoff = st.slider("Significance level (p-value cutoff)", min_value=0.01,
                        max_value=0.20, value=0.05, step=0.01, format="%.2f", key="p3_cutoff")
