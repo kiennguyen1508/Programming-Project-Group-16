@@ -30,6 +30,10 @@ RELATIONSHIP_NOTES = {"Silver vs Gold": "How did silver react to gold's movement
                       "Oil vs Gold": "Did oil and gold move together, and did that change during the 2026 Iran tension? "
                                      "A β near 0 means no link."}
 
+ONE_FOR_ONE = {"Silver vs Gold": True,
+               "Silver vs Gold + Copper": True,
+               "Oil vs Gold": False}          # one-for-one doesnt make sense for oil
+
 PERIOD_COLOURS = {"Before": "#7C8798", "Boom": "#B45309", "Crash": "#2563EB",
                   "2015-2024": "#7C8798", "2025": "#B45309", "2026 YTD": "#2563EB"}
 
@@ -106,7 +110,7 @@ def run_ols(y, x, alpha_level=0.05, robust=True):
     return beta_hat, se_beta_hat, t_crit, r_squared, n
 
 
-def results_by_period(returns, y_name, regressors, period_dates, periods, alpha_level=0.05, robust=True):
+def results_by_period(returns, y_name, regressors, period_dates, periods, alpha_level=0.05, robust=True, one_for_one=True):
     """
     Run the regression for each chosen period and return one row per period and regressor.
     """
@@ -122,7 +126,7 @@ def results_by_period(returns, y_name, regressors, period_dates, periods, alpha_
             name = regressors[i]
             b = beta_hat[i + 1]         # +1 skips the intercept
             s = se[i + 1]               # +1 skips the intercept
-            rows.append({
+            row = {
                 "Period": label,
                 "Regressor": name,
                 "Beta": b,
@@ -130,10 +134,13 @@ def results_by_period(returns, y_name, regressors, period_dates, periods, alpha_
                 "CI low": b - t_crit * s,
                 "CI high": b + t_crit * s,
                 "t (β=0)": b / s,
-                "t (β=1)": (b - 1) / s,
-                "R²": r2,
-                "n": n,
-            })
+            }
+            if one_for_one:
+                row["t (β=1)"] = (b - 1) / s
+            row["R²"] = r2
+            row["n"] = n
+            rows.append(row)
+
     return pd.DataFrame(rows)
 
 
@@ -184,7 +191,7 @@ def make_scatter(returns, y_name, regressors, period_dates, periods, alpha_level
     return fig
 
 
-def make_dot_whisker(by_period, regressors, period_dates, confidence):
+def make_dot_whisker(by_period, regressors, period_dates, confidence, one_for_one=True):
     """
     Each beta as a dot with its confidence interval, one colour per period.
     Dashed lines at 0 (no link) and 1 (one-for-one with gold).
@@ -214,8 +221,9 @@ def make_dot_whisker(by_period, regressors, period_dates, confidence):
 
     fig.add_vline(x = 0, line_dash = "dot", line_color = "grey",
                   annotation_text = "β = 0", annotation_position = "top")
-    fig.add_vline(x = 1, line_dash = "dash", line_color = "grey",
-                  annotation_text = "β = 1", annotation_position = "top")
+    if one_for_one:
+        fig.add_vline(x = 1, line_dash = "dash", line_color = "grey",
+                      annotation_text = "β = 1", annotation_position = "top")
     fig.update_layout(
         height = 150 + 80 * len(regressors),
         xaxis_title = f"Beta with {confidence:.0%} confidence interval",
@@ -443,7 +451,9 @@ def render():
         st.warning("Pick at least one period to see the results.")
         return
 
-    by_period = results_by_period(returns, y_name, regressors, period_dates, chosen, 1 - confidence, robust)
+    one_for_one = ONE_FOR_ONE[relationship]
+    by_period = results_by_period(returns, y_name, regressors, period_dates, chosen, 1 - confidence, robust,
+                                  one_for_one)
 
     views = ["Scatter", "Dot and whisker"]
     if len(regressors) == 2:
@@ -458,7 +468,7 @@ def render():
     if view == "Scatter":
         st.plotly_chart(make_scatter(returns, y_name, regressors, period_dates, chosen, 1 - confidence))
     elif view == "Dot and whisker":
-        st.plotly_chart(make_dot_whisker(by_period, regressors, period_dates, confidence))
+        st.plotly_chart(make_dot_whisker(by_period, regressors, period_dates, confidence, one_for_one))
     else:
         which = st.selectbox(
             "Period for the 3D view",
