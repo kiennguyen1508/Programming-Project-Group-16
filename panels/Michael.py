@@ -449,10 +449,10 @@ def render():
             key="p4_primary_asset",
         )
     with c2:
-        selected_period = st.selectbox(
+        selected_period = st.segmented_control(
             "Year / period",
             PERIODS[:3],
-            index=0,
+            default=PERIODS[0],
             key="p4_primary_period",
         )
     with c3:
@@ -481,10 +481,10 @@ def render():
                 key="p4_compare_asset",
             )
         with cc2:
-            compare_period = st.selectbox(
+            compare_period = st.segmented_control(
                 "Comparison year / period",
                 PERIODS[:3],
-                index=1 if len(PERIODS[:3]) > 1 else 0,
+                default=PERIODS[1],
                 key="p4_compare_period",
             )
         distribution_specs.append((compare_asset, compare_period))
