@@ -139,7 +139,7 @@ def make_change_heatmap(before, after, cutoff, title, pair=None):
     fig = make_heatmap(diff, p_table, cutoff, title, pair)
     fig.data[1].update(zmin=-0.5, zmax=0.5, customdata=hover)
     fig.data[1].colorbar.update(tickvals=[-0.5, 0, 0.5],
-                                ticktext=["moved apart", "no change", "moved closer"])
+                                ticktext=["correlation fell", "no change", "correlation rose"])
     fig.update_layout(title_text=fig.layout.title.text.replace(
         "Which assets move together?", "Which relationships changed?"))
     return fig
@@ -156,6 +156,15 @@ def ranking_table(before, after, cutoff):
     table["Significant"] = table["p-value"] < cutoff
     return table.sort_values(["Significant", "Change"], ascending=False, 
                              key=lambda col: col.abs() if col.name == "Change" else col)
+def colour_change(value):
+    """Gold if the pair moved closer, blue if it moved apart; stronger = bigger change."""
+    strength = min(abs(value) / 0.3, 1)
+    rgb = "224,168,46" if value > 0 else "46,111,216"
+    return f"background-color: rgba({rgb},{0.2 + 0.6 * strength:.2f}); color: white"
+
+def fade_ns(row):
+    """Grey out every cell in rows that aren't significant."""
+    return ["color: #6B7280" if not row["Significant"] else ""] * len(row)
 
 def make_rolling_chart(returns: pd.DataFrame, a: str, b: str, window: int, start):
     """Line chart of the correlation between a and b, calculated over a sliding window period"""
@@ -261,12 +270,12 @@ def render():
             table = ranking_table(before_all[assets], period[assets], cutoff)
             st.caption(f"{int(table['Significant'].sum())} of {len(table)} pairs changed "
                        f"significantly (p < {cutoff}).")
-            st.dataframe(table, hide_index=True, width="stretch", column_config={
-                "Before": st.column_config.NumberColumn(format="%+.2f"),
-                "After": st.column_config.NumberColumn(format="%+.2f"),
-                "Change": st.column_config.NumberColumn(format="%+.2f"),
-                "p-value": st.column_config.NumberColumn(format="%+.3f"),
-                "Significant": st.column_config.CheckboxColumn("Significant?")})
+            styled = (table.style.apply(fade_ns, axis=1)
+                  .map(colour_change, subset=["Change"])
+                  .format({"Before": "{:+.2f}", "After": "{:+.2f}", "Change": "{:+.2f}",
+                           "p-value": lambda p: "<0.001" if p < 0.001 else f"{p:.3f}"}))
+            st.dataframe(styled, hide_index=True, width="stretch",
+                     column_config={"Significant": st.column_config.CheckboxColumn("Significant?")})
             st.download_button("Download as CSV", table.to_csv(index=False),
                                file_name="correlation_changes.csv", key="p3_download")
 
