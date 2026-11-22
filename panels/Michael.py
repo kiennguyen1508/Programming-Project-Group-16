@@ -514,7 +514,7 @@ def render():
         else:
             st.plotly_chart(
                 fig,
-                use_container_width=True,
+                width="stretch",
                 key="p4_volcano_3d",
                 config={"scrollZoom": True, "displaylogo": False},
             )
@@ -545,7 +545,7 @@ def render():
     if not table.empty:
         numeric = [c for c in table.columns if c not in ["Asset", "Period", "Observations"]]
         table[numeric] = table[numeric].round(3)
-        st.dataframe(table, hide_index=True, use_container_width=True)
+        st.dataframe(table, hide_index=True, width="stretch")
     else:
         st.info("Not enough observations for the selected risk statistics.")
     st.caption(
@@ -556,7 +556,7 @@ def render():
     st.markdown("### 3. Did historical downside-risk limits still hold?")
     breaches = var_breach_table(returns, selected_for_risk)
     if not breaches.empty:
-        st.dataframe(breaches.round(3), hide_index=True, use_container_width=True)
+        st.dataframe(breaches.round(3), hide_index=True, width="stretch")
     else:
         st.info("Insufficient pre-2025 or post-2024 history to backtest 95% VaR.")
     st.caption(
@@ -573,13 +573,13 @@ def render():
     )
     st.plotly_chart(
         make_rolling_volatility(returns, selected_for_risk, window),
-        use_container_width=True, key="p4_volcano_rolling"
+        width="stretch", key="p4_volcano_rolling"
     )
 
     st.markdown("### 5. Are the distribution changes statistically detectable?")
     tests = tests_table(returns, selected_for_risk)
     if not tests.empty:
-        st.dataframe(tests.round(4), hide_index=True, use_container_width=True)
+        st.dataframe(tests.round(4), hide_index=True, width="stretch")
     else:
         st.info("Insufficient observations for the pre-2025 versus post-2024 tests.")
     st.caption(
@@ -633,4 +633,4 @@ def overview():
             margin=dict(l=5, r=5, t=45, b=5),
             legend=dict(orientation="h", y=1.12)
         )
-        st.plotly_chart(fig, use_container_width=True, key="p4_volcano_overview")
+        st.plotly_chart(fig, width="stretch", key="p4_volcano_overview")
