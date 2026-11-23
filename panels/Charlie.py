@@ -61,8 +61,10 @@ A change in β between two periods is tested with z = (β̂₂ - β̂₁) / √(
 **Limitations.**
 - The regression shows association, not causation. It describes how silver moved with gold on the same day;
   it does not forecast future returns or show that gold causes silver to move.
-- Daily returns have fat tails, so a few extreme days (such as the large falls after silver's peak) can pull β̂ up.
-  The robust standard errors make the intervals wider to reflect this.
+- Daily returns have fat tails, so a few extreme days (such as the large falls after silver's peak) can have a big
+  influence on β̂. Robust standard errors allow for changing volatility, but they do not remove the effect of these days.
+- The standard errors assume each day's error is unrelated to the next day's. Robust standard errors do not correct
+  for autocorrelation, although daily returns usually show little of it.
 - The Boom and Crash periods are much shorter than Before, so their estimates are less precise.
 - Brent crude and the metals do not close at exactly the same time each day, which can bias daily betas towards zero.
 - Futures prices jump slightly when contracts roll over.
@@ -467,7 +469,7 @@ def render():
         robust = st.toggle(
             "Robust standard errors (White)",
             value = True,
-            help = "Allows for some days being much more volatile than others. It widens the confidence intervals; β does not change.",
+            help = "Allows for some days being much more volatile than others. Only the standard errors and confidence intervals change; β does not change.",
             key = "cha_robust",
         )
 
