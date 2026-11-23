@@ -623,22 +623,24 @@ def render():
 
     st.info(answer(by_period, relationship, confidence))
 
-    st.markdown("**Regression results**")
-    if robust:
-        st.caption(f"Confidence intervals at the {confidence:.0%} level, using White robust standard errors")
-    else:
-        st.caption(f"Confidence intervals at the {confidence:.0%} level, assuming constant error variance")
+    col_title, col_csv = st.columns([4, 1], vertical_alignment = "bottom")
+    with col_title:
+        st.markdown("**Regression results**")
+        if robust:
+            st.caption(f"Confidence intervals at the {confidence:.0%} level, using White robust standard errors")
+        else:
+            st.caption(f"Confidence intervals at the {confidence:.0%} level, assuming constant error variance")
+    with col_csv:
+        st.download_button(
+            "Download CSV",
+            data = by_period.to_csv(index = False).encode("utf-8"),
+            file_name = f"regression_{relationship.replace(' ', '_').lower()}.csv",
+            mime = "text/csv",
+            key = "cha_download",
+        )
     st.dataframe(by_period.round(3), hide_index = True, width = "stretch")
     st.caption("Beta is the average move. CI low to CI high is the confidence interval, a range of plausible values for β. "
                "n is the number of trading days.")
-
-    st.download_button(
-        "Download results (CSV)",
-        data = by_period.to_csv(index = False).encode("utf-8"),
-        file_name = f"regression_{relationship.replace(' ', '_').lower()}.csv",
-        mime = "text/csv",
-        key = "cha_download",
-    )
 
     with st.expander("What the results mean", expanded = True):
         st.markdown("##### What β tells us")
