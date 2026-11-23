@@ -300,7 +300,7 @@ def render():
     returns = get_returns().join(load_macro(), how="inner").dropna()
 
     # 1. Controls
-    view = st.radio("View", ["Correlation Heatmap", "What Changed?", "Rolling Graph", "Animated Timeline", "Ranking Table"], horizontal=True, key="p3_view")
+    view = st.radio("View", ["Correlation Heatmap", "Rolling Graph", "Animated Timeline", "Decoupling Analysis"], horizontal=True, key="p3_view")
     if view == "Rolling Graph":
         assets = list(returns.columns)
         if "p3_assets" in st.session_state:
@@ -350,15 +350,6 @@ def render():
         title = f"{start:%b %Y} to {end:%b %Y}"
         st.plotly_chart(make_heatmap(r_table, p_table, cutoff, title, pair=(a,b)), width="stretch")
         st.caption(f"{len(period)} trading days. n.s. = not significant (p >= {cutoff}).")
-    elif view == "What Changed?":
-        before = returns[returns.index < pd.Timestamp(start)]
-        if len(before) < 30:
-            st.info("Move the start date later so there's a 'before' period to compare against.")
-        else:
-            title = f"Before {start:%b %Y} vs {start:%b %Y} to {end:%b %Y}"
-            st.plotly_chart(make_change_heatmap(before[assets], period[assets], cutoff, title,
-                                            pair=(a, b)), width="stretch")
-        st.caption("Blue = correlation fell, gold = correlation rose. Hover for before/after values.")
     elif view == "Animated Timeline":
         st.plotly_chart(make_animated_heatmap(returns, assets, cutoff), width="stretch")
         st.caption("Press play to see how the correlations change year by year. "
@@ -382,24 +373,31 @@ def render():
         if pair2:
             st.markdown(f"##### Additional Assets: {pair2[0]} x {pair2[1]}")
             show_rolling_stats(returns, pair2[0], pair2[1], window, start, end)
-    if view != "Ranking Table":
+    if view != "Decoupling Analysis":
         return
 
     # 3.5 Ranking every pair by how much it changed, using the fisher test.
     before_all = returns[returns.index < pd.Timestamp(start)]
     if len(before_all) >= 30:
-        with st.expander("Asset Pairs Ranked by Change", expanded=True):
-            table = ranking_table(before_all[assets], period[assets], cutoff)
-            st.caption(f"{int(table['Significant'].sum())} of {len(table)} pairs changed "
-                       f"significantly (p < {cutoff}).")
-            styled = (table.style.apply(fade_ns, axis=1)
-                  .map(colour_change, subset=["Change"])
-                  .format({"Before": "{:+.2f}", "After": "{:+.2f}", "Change": "{:+.2f}",
-                           "p-value": lambda p: "<0.001" if p < 0.001 else f"{p:.3f}"}))
-            st.dataframe(styled, hide_index=True, width="stretch",
-                     column_config={"Significant": st.column_config.CheckboxColumn("Significant?")})
-            st.download_button("Download as CSV", table.to_csv(index=False),
-                               file_name="correlation_changes.csv", key="p3_download")
+        show_as = st.radio("Show as:", ["Table", "Heatmap"], horizontal=True, key="p3_rank_view")
+        if show_as == "Heatmap":
+            title = f"Before {start:%b %Y} vs {start:%b %Y} to {end:%b %Y}"
+            st.plotly_chart(make_change_heatmap(before_all[assets], period[assets], cutoff, title, 
+                                                pair=(a, b)), width="stretch")
+            st.caption("Blue = Correlation Fell  |  Gold = Correlation Rose  |  Hover for before/after values.")
+        else:
+            with st.expander("Asset Pairs Ranked by Change", expanded=True):
+                table = ranking_table(before_all[assets], period[assets], cutoff)
+                st.caption(f"{int(table['Significant'].sum())} of {len(table)} pairs changed "
+                           f"significantly (p < {cutoff}).")
+                styled = (table.style.apply(fade_ns, axis=1)
+                            .map(colour_change, subset=["Change"])
+                            .format({"Before": "{:+.2f}", "After": "{:+.2f}", "Change": "{:+.2f}",
+                                     "p-value": lambda p: "<0.001" if p < 0.001 else f"{p:.3f}"}))
+                st.dataframe(styled, hide_index=True, width="stretch",
+                            column_config={"Significant": st.column_config.CheckboxColumn("Significant?")})
+                st.download_button("Download as CSV", table.to_csv(index=False),
+                                    file_name="correlation_changes.csv", key="p3_download")
 
     # 4. Fisher Test: The chosen period vs everything that comes before it.
     st.markdown("#### Pair in Focus: Real Change or Random Noise?")
