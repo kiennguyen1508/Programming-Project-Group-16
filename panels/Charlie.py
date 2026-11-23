@@ -177,7 +177,7 @@ def make_scatter(returns, y_name, regressors, period_dates, periods):
             name = label,
             legendgroup = label,
             showlegend = False,
-            marker = dict(size = 4, opacity = 0.3, color = PERIOD_COLOURS[label]),
+            marker = dict(size = 4, opacity = 0.7, color = PERIOD_COLOURS[label]),
         ))
 
         line_x = np.array([data["Gold"].min(), data["Gold"].max()])
@@ -269,7 +269,7 @@ def make_3d(returns, y_name, regressors, period_dates, label):
         z = data[y_name],
         mode = "markers",
         name = "Daily returns",
-        marker = dict(size = 2, opacity = 0.5, color = PERIOD_COLOURS[label]),
+        marker = dict(size = 2, opacity = 0.7, color = PERIOD_COLOURS[label]),
     ))
     fig.add_trace(go.Surface(
         x = grid_1,
@@ -433,23 +433,27 @@ def render():
 
     returns = load_returns()
 
-    relationship = st.radio(
+    relationship = st.segmented_control(
         "Relationship",
         options = list(RELATIONSHIPS),
-        horizontal = True,
+        default = "Silver vs Gold",
         key = "cha_rel",
     )
+    if relationship is None:
+        relationship = "Silver vs Gold"
     y_name, regressors = RELATIONSHIPS[relationship]
     st.caption(RELATIONSHIP_NOTES[relationship])
 
     col_split, col_conf, col_robust = st.columns([2, 1, 1], vertical_alignment = "bottom")
     with col_split:
-        scheme = st.radio(
+        scheme = st.segmented_control(
             "Split the data by",
             options = ["Boom and crash", "Calendar years"],
-            horizontal = True,
+            default = "Boom and crash",
             key = "cha_scheme",
         )
+        if scheme is None:
+            scheme = "Boom and crash"
     with col_conf:
         confidence = st.select_slider(
             "Confidence level",
@@ -472,9 +476,10 @@ def render():
     else:
         period_dates = YEARS
 
-    chosen = st.multiselect(
+    chosen = st.pills(
         "Periods",
         options = list(period_dates),
+        selection_mode = "multi",
         default = list(period_dates),
         key = f"cha_per_{scheme}",
     )
@@ -495,12 +500,14 @@ def render():
     if len(regressors) == 2:
         views.insert(0, "3D plane")
 
-    view = st.radio(
+    view = st.segmented_control(
         "Chart",
         options = views,
-        horizontal = True,
+        default = views[0],
         key = f"cha_view_{len(regressors)}",
     )
+    if view is None:
+        view = views[0]
     if view == "Scatter":
         st.plotly_chart(make_scatter(returns, y_name, regressors, period_dates, chosen))
         if len(regressors) == 2:
