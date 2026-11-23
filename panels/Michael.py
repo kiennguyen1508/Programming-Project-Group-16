@@ -657,7 +657,7 @@ def render():
         "KS tests compare full return distributions; Levene tests compare "
         "variances. Standard p-values assume independent observations. Daily "
         "financial returns can be volatility-clustered, so treat these as "
-        "indicative and interpret them with the graph and effect size."
+        "indicative and interpret them with the graph and effect sizes."
     )
 
     st.markdown("### 6. Methodology and limitations")
@@ -705,4 +705,3 @@ def overview():
             legend=dict(orientation="h", y=1.12)
         )
         st.plotly_chart(fig, width="stretch", key="p4_volcano_overview")
-
