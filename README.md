@@ -123,6 +123,9 @@ Each panel has its own "Method and Limitations" section in the app with the deta
 - `data/DFII10.csv`: This file supplies the real yield column figures in `macro.csv`.
 - `data/VIX_History.csv` : This supplies the VIX column figures in `macro.csv`. 
 
+Gold, Silver, Oil and the S&P 500 use daily log returns. The other assets use the daily percentage change, apart from the real yield, which uses the daily change in percentage points. In certain trading days, there is not complete data on each of the analysed and used assets. In these cases, the trading day as a whole is excluded, leaving apporximately 
+2,900 complete trading days from Jan 2015, to October 2026, which my panel uses.
+
 ###  Panel 4: Michael's panel
 
 ## Contributions
