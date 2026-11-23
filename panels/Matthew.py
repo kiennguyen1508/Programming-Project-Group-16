@@ -315,7 +315,7 @@ def render():
     else:
         if "p3_dates" not in st.session_state:
             st.session_state.p3_dates = (pd.Timestamp(SPLIT).date(), last)
-        st.caption("Quick Period Select")
+        st.markdown(":small[Quick Period Select]")
         for col, name in zip(st.columns(4), ["Before", "Boom", "Crash", "2025 Onwards"]):
                    col.button(name, key=f"p3_btn_{name}", on_click=set_period,
                    args=(name, first, last), width="stretch")
