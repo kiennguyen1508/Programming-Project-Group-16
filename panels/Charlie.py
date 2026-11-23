@@ -305,7 +305,7 @@ def describe(row, y_name, regressors, confidence, one_for_one=True):
     held = ""
     for other in regressors:
         if other != name:
-            held = f", holding {other.lower()} constant"
+            held = f", holding {other.lower()} constant,"
 
     if row["Beta"] < 0:
         direction = "fall"
@@ -330,8 +330,8 @@ def describe(row, y_name, regressors, confidence, one_for_one=True):
     else:
         verdict = "not clearly different from zero"
 
-    return (f"**{row['Period']}:** a 1% rise in {name.lower()}{held} was associated with about a "
-            f"{abs(row['Beta']):.2f}% {direction} in {y_name.lower()} on average "
+    return (f"**{row['Period']}:** a 1% daily rise in {name.lower()}{held} was associated with about a "
+            f"{abs(row['Beta']):.2f}% daily {direction} in {y_name.lower()} on average "
             f"({confidence:.0%} CI {row['CI low']:.2f} to {row['CI high']:.2f}). This is {verdict}.")
 
 
@@ -377,8 +377,8 @@ def answer(by_period, relationship, confidence):
         else:
             headline = "Not clearly more strongly than gold."
         text = (f"**How did silver react to gold's movements?** {headline}\n\n"
-                f"In the {latest['Period']} period, a 1% move in gold was associated with about a "
-                f"{latest['Beta']:.1f}% move in silver on average. Silver's moves were significantly bigger "
+                f"In the {latest['Period']} period, a 1% daily move in gold was associated with about a "
+                f"{latest['Beta']:.1f}% daily move in silver on average. Silver's moves were significantly bigger "
                 f"than gold's in {above} of {n_periods} periods, at the {confidence:.0%} confidence level.")
 
     elif relationship == "Silver vs Gold + Copper":
@@ -392,8 +392,8 @@ def answer(by_period, relationship, confidence):
         else:
             headline = "Mostly industrial."
         text = (f"**Is silver a precious or an industrial metal?** {headline}\n\n"
-                f"In the {latest['Period']} period, holding the other metal constant, a 1% move in gold was associated "
-                f"with about a {latest['Beta']:.1f}% move in silver, and a 1% move in copper with about a "
+                f"In the {latest['Period']} period, holding the other metal constant, a 1% daily move in gold was associated "
+                f"with about a {latest['Beta']:.1f}% daily move in silver, and a 1% daily move in copper with about a "
                 f"{latest_copper['Beta']:.1f}% move. Silver moved more with gold than with copper in "
                 f"{gold_bigger} of {n_periods} periods.")
 
@@ -415,8 +415,8 @@ def answer(by_period, relationship, confidence):
         else:
             move = "rise"
         text = (f"**Did oil and gold move together?** {headline}\n\n"
-                f"In the {latest['Period']} period, a 1% rise in gold was associated with about a "
-                f"{abs(latest['Beta']):.1f}% {move} in oil on average. The link was significantly different from zero in "
+                f"In the {latest['Period']} period, a 1% daily rise in gold was associated with about a "
+                f"{abs(latest['Beta']):.1f}% daily {move} in oil on average. The link was significantly different from zero in "
                 f"{clear} of {n_periods} periods, at the {confidence:.0%} confidence level.")
     return text
 
@@ -511,7 +511,7 @@ def render():
     if view == "Scatter":
         st.plotly_chart(make_scatter(returns, y_name, regressors, period_dates, chosen))
         if len(regressors) == 2:
-            st.caption("Each dot is one trading day. The lines show silver's move for each 1% move in gold, with copper held at its average.")
+            st.caption("Each dot is one trading day. The lines show silver's move for each 1% daily move in gold, with copper held at its average.")
     elif view == "Dot and whisker":
         st.plotly_chart(make_dot_whisker(by_period, regressors, period_dates, confidence, one_for_one))
         st.caption("Each dot is β and the line through it is the confidence interval. "
@@ -567,5 +567,5 @@ def overview():
     fig.update_layout(height = 300, xaxis_title = None, margin = dict(l=10, r=10, t=30, b=0))
     fig.update_yaxes(showticklabels = False)
     st.plotly_chart(fig, config = {"staticPlot": True}, key = "cha_overview_chart")
-    st.caption(f"After silver's peak on {SILVER_PEAK:%d %b %Y}, a 1% move in gold was associated "
-               f"with about a {crash_beta:.1f}% move in silver")
+    st.caption(f"After silver's peak on {SILVER_PEAK:%d %b %Y}, a 1% daily move in gold was associated "
+               f"with about a {crash_beta:.1f}% daily move in silver")
