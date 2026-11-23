@@ -182,6 +182,19 @@ def confidence_band(rolling, window):
     se = 1 / np.sqrt(window - 3)
     return np.tanh(z - 1.96 * se), np.tanh(z + 1.96 * se)
 
+def show_rolling_stats(returns, a, b, window, start, end):
+    """Five little stats to help simplify graph analysis. This time for the additional assets comparison."""
+    rolling = rolling_corr(returns, a, b, window)
+    start, end = pd.Timestamp(start), pd.Timestamp(end)
+    before_r = rolling[rolling.index < start].mean()
+    during_r = rolling[(rolling.index >= start) & (rolling.index <= end)].mean()
+    m1, m2, m3, m4, m5 = st.columns(5)
+    m1.metric("Latest", f"{rolling.iloc[-1]:+.2f}")
+    m2.metric("Average Before Selected Period", f"{before_r:+.2f}" if pd.notna(before_r) else "-")
+    m3.metric("Average in Selected Period", f"{during_r:+.2f}", f"{during_r - before_r:+.2f}", delta_color="off")
+    m4.metric(f"Lowest ({rolling.idxmin():%b %Y})", f"{rolling.min():+.2f}")
+    m5.metric(f"Highest ({rolling.idxmax():%b %Y})", f"{rolling.max():+.2f}")
+
 def make_rolling_chart(returns, a, b, window, start, end, pair2=None):
     # (a) the band and the line(s)
     rolling = rolling_corr(returns, a, b, window)
@@ -195,7 +208,7 @@ def make_rolling_chart(returns, a, b, window, start, end, pair2=None):
                              line=dict(color=GOLD, width=2), hovertemplate="%{y:+.2f}"))
     if pair2:
         other = rolling_corr(returns, pair2[0], pair2[1], window)
-        fig.add_trace(go.Scatter(x=other.index, y=other, name=f"{pair2[0]} – {pair2[1]}",
+        fig.add_trace(go.Scatter(x=other.index, y=other, name=f"{pair2[0]} x {pair2[1]}",
                                  line=dict(color=BLUE, width=2), hovertemplate="%{y:+.2f}"))
 
     # (b) shaded events and your period
@@ -225,10 +238,10 @@ def make_rolling_chart(returns, a, b, window, start, end, pair2=None):
     fig.update_layout(height=480, hovermode="x unified", margin=dict(l=10, r=10, t=120, b=10),
         paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font=dict(color=LIGHT_TEXT),
         legend=dict(orientation="h", y=1.02, x=1, xanchor="right", yanchor="bottom"),
-        title=dict(x=0.01, text=f"<b>{a} x {b}: {window}-day rolling correlation</b><br>"
-                   f"<span style='font-size:13px;color:{SOFT_TEXT}'>Shaded band = 95% range · "
-                   f"dotted/dashed lines = average before / during your period</span>"))
-    fig.update_yaxes(range=[-1, 1], title="Correlation (r)", gridcolor="#1C2230",
+        title=dict(x=0.01, text=f"<b>{a} x {b}: {window}-day Rolling Correlation</b><br>"
+                   f"<span style='font-size:13px;color:{SOFT_TEXT}'>Shaded Band = 95% Confidence Interval   |   "
+                   f"Dotted Lines = Average Before/During the Selected Period</span>"))
+    fig.update_yaxes(range=[-1, 1], title="Correlation Coefficient (r)", gridcolor="#1C2230",
                      zeroline=False, automargin=True)
     fig.update_xaxes(gridcolor="#1C2230", rangeslider=dict(visible=True, thickness=0.06),
         rangeselector=dict(x=0, y=1.02, yanchor="bottom", bgcolor="#1C2230",
@@ -278,7 +291,7 @@ def set_period(name, first, last):
     split, peak = pd.Timestamp(SPLIT).date(), SILVER_PEAK.date()
     one_day = pd.Timedelta(days=1)
     periods = {"Before": (first, split - one_day), "Boom": (split, peak),
-               "Crash": (peak + one_day, last), "All since 2025": (split, last)}
+               "Crash": (peak + one_day, last), "2025 Onwards": (split, last)}
     st.session_state.p3_dates = periods[name]
 
 def render():
@@ -288,24 +301,38 @@ def render():
 
     # 1. Controls
     view = st.radio("View", ["Correlation Heatmap", "What Changed?", "Rolling Graph", "Animated Timeline", "Ranking Table"], horizontal=True, key="p3_view")
-    assets = st.multiselect("Assets", list(returns.columns),
-                        default=["Gold", "Silver", "Oil", "S&P 500", "Real yield"],
-                        key="p3_assets")
+    if view == "Rolling Graph":
+        assets = list(returns.columns)
+        if "p3_assets" in st.session_state:
+            st.session_state.p3_assets = st.session_state.p3_assets
+    else:
+        assets = st.multiselect("Assets", list(returns.columns),
+                                default=["Gold", "Silver", "Oil", "S&P 500", "Real yield"],
+                                key="p3_assets")
     first, last = returns.index.min().date(), returns.index.max().date()
-    if "p3_dates" not in st.session_state:
-        st.session_state.p3_dates = (pd.Timestamp(SPLIT).date(), last)
-    st.caption("Quick Period Select")
-    for col, name in zip(st.columns(4), ["Before", "Boom", "Crash", "2025 Onwards"]):
-        col.button(name, key=f"p3_btn_{name}", on_click=set_period,
+    if view == "Animated Timeline":
+        start, end = first, last
+        if "p3_dates" in st.session_state:
+            st.session_state.p3_dates = st.session_state.p3_dates
+    else:
+        if "p3_dates" not in st.session_state:
+            st.session_state.p3_dates = (pd.Timestamp(SPLIT).date(), last)
+        st.caption("Quick Period Select")
+        for col, name in zip(st.columns(4), ["Before", "Boom", "Crash", "2025 Onwards"]):
+                   col.button(name, key=f"p3_btn_{name}", on_click=set_period,
                    args=(name, first, last), width="stretch")
-    start, end = st.slider("Time Period", min_value=first, max_value=last,
+        start, end = st.slider("Time Period", min_value=first, max_value=last,
                            format="MMM YYYY", key="p3_dates")
-    cutoff = st.slider("Significance Level", min_value=0.01,
-                       max_value=0.20, value=0.05, step=0.01, format="%.2f", key="p3_cutoff")
     for key in ("p3_pair_a", "p3_pair_b"):
         if key in st.session_state:
             st.session_state[key] = st.session_state[key]
-    
+    if view == "Rolling Graph":
+        cutoff = 0.05
+        if "p3_cutoff" in st.session_state:
+            st.session_state.p3_cutoff = st.session_state.p3_cutoff
+    else:
+        cutoff = st.slider("Significance Level", min_value=0.01, max_value=0.20,
+                        value=0.05, step=0.01, format="%.2f", key="p3_cutoff")
     a = st.session_state.get("p3_pair_a", assets[0])
     b = st.session_state.get("p3_pair_b", assets[min(2, len(assets) - 1)])
 
@@ -322,7 +349,7 @@ def render():
         r_table, p_table = correlation_table(period[assets])
         title = f"{start:%b %Y} to {end:%b %Y}"
         st.plotly_chart(make_heatmap(r_table, p_table, cutoff, title, pair=(a,b)), width="stretch")
-        st.caption(f"{len(period)} trading days. Blank cells are not significant (p >= {cutoff}).")
+        st.caption(f"{len(period)} trading days. n.s. = not significant (p >= {cutoff}).")
     elif view == "What Changed?":
         before = returns[returns.index < pd.Timestamp(start)]
         if len(before) < 30:
@@ -331,7 +358,7 @@ def render():
             title = f"Before {start:%b %Y} vs {start:%b %Y} to {end:%b %Y}"
             st.plotly_chart(make_change_heatmap(before[assets], period[assets], cutoff, title,
                                             pair=(a, b)), width="stretch")
-        st.caption("Blue = the pair moved apart, gold = moved closer. Hover for before/after values.")
+        st.caption("Blue = correlation fell, gold = correlation rose. Hover for before/after values.")
     elif view == "Animated Timeline":
         st.plotly_chart(make_animated_heatmap(returns, assets, cutoff), width="stretch")
         st.caption("Press play to see how the correlations change year by year. "
@@ -339,25 +366,22 @@ def render():
                     
     elif view == "Rolling Graph":
         r1, r2 = st.columns(2)
-        ra = r1.selectbox("Rolling pair", assets, index=0, key="p3_roll_a")
-        rb = r2.selectbox("against", assets, index=min(1, len(assets) - 1), key="p3_roll_b")
+        ra = r1.selectbox("Comparing:", assets, index=0, key="p3_roll_a")
+        rb = r2.selectbox("Against:", assets, index=min(1, len(assets) - 1), key="p3_roll_b")
         if ra == rb:
             st.info("Pick two different assets for the rolling chart.")
         c1, c2 = st.columns(2)
-        window = c1.slider("Rolling window (trading days)", 30, 250, 90, step=10, key="p3_window")
+        window = c1.slider("Smoothing: days per calculation", 30, 250, 90, step=10, key="p3_window",
+                           help="Each point is the correlation over the previous N trading days. A bigger N makes a smoother line.")
         pairs = [f"{x} vs {y}" for i, x in enumerate(assets) for y in assets[i + 1:]]
-        extra = c2.selectbox("Also compare (optional)", ["None"] + pairs, key="p3_pair2")
+        extra = c2.selectbox("Additional Asset Comparison:", ["None"] + pairs, key="p3_pair2")
         pair2 = None if extra == "None" else extra.split(" vs ")
         st.plotly_chart(make_rolling_chart(returns, ra, rb, window, start, end, pair2), width="stretch")
-        rolling = rolling_corr(returns, ra, rb, window)
-        before_r = rolling[rolling.index < pd.Timestamp(start)].mean()
-        during_r = rolling[(rolling.index >= pd.Timestamp(start)) & (rolling.index <= pd.Timestamp(end))].mean()
-        m1, m2, m3, m4, m5 = st.columns(5)
-        m1.metric("Latest", f"{rolling.iloc[-1]:+.2f}")
-        m2.metric("Average before", f"{before_r:+.2f}")
-        m3.metric("Average in period", f"{during_r:+.2f}", f"{during_r - before_r:+.2f}", delta_color="off")
-        m4.metric(f"Lowest ({rolling.idxmin():%b %Y})", f"{rolling.min():+.2f}")
-        m5.metric(f"Highest ({rolling.idxmax():%b %Y})", f"{rolling.max():+.2f}")
+        st.markdown("#### Correlation Coefficient (r) Statistics")
+        show_rolling_stats(returns, ra, rb, window, start, end)
+        if pair2:
+            st.markdown(f"##### Additional Assets: {pair2[0]} x {pair2[1]}")
+            show_rolling_stats(returns, pair2[0], pair2[1], window, start, end)
     if view != "Ranking Table":
         return
 
