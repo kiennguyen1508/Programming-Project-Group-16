@@ -58,7 +58,7 @@ def correlation_table(returns: pd.DataFrame) -> tuple:
 
 
 
-def make_heatmap(r_table, p_table, cutoff, title, pair=None, heading="Year by Year: How the Links Shift"):
+def make_heatmap(r_table, p_table, cutoff, title, pair=None, heading="Which Assets Tend to Move Together?"):
     names = list(r_table.index)
     upper = np.triu(np.ones(r_table.shape, dtype=bool), k=1)
     sig = r_table.where(upper & (p_table.values < cutoff))
@@ -92,8 +92,8 @@ def make_heatmap(r_table, p_table, cutoff, title, pair=None, heading="Year by Ye
         i, j = sorted([names.index(pair[0]), names.index(pair[1])])
         fig.add_shape(type="rect", x0=j - 0.5, x1=j + 0.5, y0=i - 0.5, y1=i + 0.5,
                         line=dict(color="white", width=2))
-    subtitle = (f"<span style='font-size:13px;color:{SOFT_TEXT}'>{title} . "
-                f"n.s. = not significant (p >= {cutoff:.2f}) . outlined = pair under test</span>")
+    subtitle = (f"<span style='font-size:13px;color:{SOFT_TEXT}'>{title}  |  "
+                f"n.s. = Not Significant (p >= {cutoff:.2f})  |  Outlined = Pair Under Test</span>")
     fig.update_xaxes(visible=False)
     fig.update_yaxes(visible=False, autorange="reversed")
     fig.update_layout(height=450, margin=dict(l=10, r=10, t=80, b=10),
@@ -134,18 +134,16 @@ def change_table(before, after):
     p_table = pd.DataFrame(p, index=r1.index, columns=r1.columns)
     return r2 - r1, p_table, r1, r2
 
-def make_change_heatmap(before, after, cutoff, title, pair=None):
+def make_change_heatmap(before, after, cutoff, title, pair=None, heading="Which Relationships Changed?"):
     diff, p_table, r1, r2 = change_table(before, after)
     names = list(diff.index)
     hover = [[f"<b>{a} × {b}</b><br>before: {r1.loc[a, b]:+.2f}<br>after: {r2.loc[a, b]:+.2f}"
               f"<br>change: {diff.loc[a, b]:+.2f} (p = {p_table.loc[a, b]:.3f})"
               for b in names] for a in names]
-    fig = make_heatmap(diff, p_table, cutoff, title, pair)
+    fig = make_heatmap(diff, p_table, cutoff, title, pair, heading=heading)
     fig.data[1].update(zmin=-0.5, zmax=0.5, customdata=hover)
     fig.data[1].colorbar.update(tickvals=[-0.5, 0, 0.5],
-                                ticktext=["correlation fell", "no change", "correlation rose"])
-    fig.update_layout(title_text=fig.layout.title.text.replace(
-        "Which assets move together?", "Which relationships changed?"))
+                                ticktext=["Correlation Fell", "No Change", "Correlation Rose"])
     return fig
 
 def ranking_table(before, after, cutoff):
