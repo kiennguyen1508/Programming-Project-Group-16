@@ -1,8 +1,8 @@
 # Gold and its Drivers: Economic & Finance Dashboard
 
-This interactive dashboard explores how the price of gold moves with other markets and economic factors between 2015 and 2026.
+**Main question:** What moves the price of gold, and has its behaviour changed since 2025?
 
-Each panel compares the years before 2025 with the period since, to see whether gold's behaviour has changed.
+This interactive dashboard looks at gold alongside silver, oil, the S&P 500 and several economic factors, using daily data from 2015 to October 2026. Each panel answers one part of the main question and compares 2015–2024 with the period since 2025.
 
 ## Quick start
 You need Python 3.12 or newer (check with `python3 --version`). Tested with Python 3.14.7 on macOS.
@@ -36,7 +36,9 @@ The dashboard opens in your browser at http://localhost:8501.
 If that port is busy, Streamlit uses the next one (8502) and prints the address in the terminal.
 
 The shared price and macro data is saved in the `data/` folder. The Distribution & Risk panel also needs trading-volume history from Yahoo Finance: run the app once while online to download and save that data. Later runs use the local cache and work without internet.
+## Using the dashboard
 
+The dashboard opens on an overview page with a preview of all four panels. Click **Open →** on any panel to see it in full with its controls, and **← Back to overview** to return. Each panel has a "Method and Limitations" section explaining how its results were calculated.
 
 ## Data
 
@@ -95,26 +97,36 @@ Programming-Project-Group-16/
 ## The panels
 Each panel has its own "Method and Limitations" section in the app with the details.
 
-### Charlie's panel
+###  Panel 1: Charlie's panel
 
 
-### Performance and ratios (Kien Nguyen)
+###  Panel 2: Performance and ratios (Kien Nguyen)
 **Question:** How has gold performed against the other assets, and does it actually protect investors when markets are stressed?
 
 **Data:** Gold, silver, Brent oil and the S&P 500 from `prices.csv`, plus the VIX and copper from `macro.csv`.
 
 **What it shows:** The panel has three tabs.
-- **Performance:** how each asset grew over the chosen period, or how far it fell from its previous peak (drawdown). A table compares annual return, volatility, Sharpe ratio, Sortino ratio and maximum drawdown, with the best value in each column highlighted.
+- **Performance:** how each asset grew over the chosen period, or how far it fell from its previous peak (drawdown). A table compares annual return, volatility, Sharpe ratio and Sortino ratio (both using an assumed 4% yearly risk-free rate) and maximum drawdown, with the best value in each column highlighted.
 - **Stress days:** each asset's daily return on calm days and on stressed days. A day counts as stressed if the VIX closed at or above the chosen level the day before.
 - **Ratios:** the gold/silver, gold/oil and gold/copper ratios, and how often each one moved back towards its average after drifting far from it. The average is a rolling 5-year one, so the test only uses data that was available at the time.
 
 **Controls:** period, assets, a start-date slider, a Growth/Drawdown switch and a Replay button that animates the chart. The Stress days tab also has a VIX threshold (25 by default) and a choice between the average and the median.
 
-**Key findings:** Gold did not reliably rise after fear spikes. Over the full period it averaged +0.01% a day on the 391 stressed days, compared with +0.05% on calm days, while the S%P 500 averaged +0.13% on stressed days. The gold/silver ratio was the most predictable of the three: it moved back towards its average 81% of the time, against a base rate of about 43-57%.
+**Key findings:** Gold did not reliably rise after fear spikes. Over the full period it averaged +0.01% a day on the 391 stressed days, compared with +0.05% on calm days, while the S&P 500 averaged +0.13% on stressed days. The gold/silver ratio was the most predictable of the three: when it was more than 2σ away from its rolling 5-year average, it moved back towards that average over the next 3 months 81% of the time, against a base rate of about 43-57%.
 
-### Matthew's panel
+###  Panel 3: Correlation Heatmap (Matthew Herbert)
+**Question:** Which assets move together with gold, and did those links change in relation to various economic events?
 
-### Michael's panel
+**Data:** My panel draws on four files in the `data` folder:
+- `data/prices.csv`: This is the daily closing prices for Gold, Silver, Oil and the S&P 500, from Yahoo Finance, which is called by the `get_returns()` function in `data_loader.py` python file.
+- `data/macro.csv` : This is the daily levels of Commodities, the Dollar and Copper also from Yahoo Finance, the 10-year yield and the VIX, called by `load_macro()` in my panel.
+- `data/DFII10.csv`: This file supplies the real yield column figures in `macro.csv`.
+- `data/VIX_History.csv` : This supplies the VIX column figures in `macro.csv`. 
+
+Gold, Silver, Oil and the S&P 500 use daily log returns. The other assets use the daily percentage change, apart from the real yield, which uses the daily change in percentage points. In certain trading days, there is not complete data on each of the analysed and used assets. In these cases, the trading day as a whole is excluded, leaving apporximately 
+2,900 complete trading days from Jan 2015, to October 2026, which my panel uses.
+
+###  Panel 4: Michael's panel
 
 ## Contributions
 

@@ -1,7 +1,7 @@
 import streamlit as st
 from panels import Charlie, Kien, Matthew, Michael
 
-st.set_page_config(page_title="Econ Dashboard", layout="wide")
+st.set_page_config(page_title="Gold and its Drivers", layout="wide")
 
 # 1. One entry per panel: its title, the quesion it answers,
 #    and the function that draws the full panel
@@ -14,13 +14,13 @@ PANELS = {
     },
     "performance" : {
         "title" : "Performance and ratios",
-        "question" : "How each asset has grown since 2025",
+        "question" : "How has gold performed, and does it protect investors when markets are stressed?",
         "full" : Kien.render,
         "preview": getattr(Kien, "overview", None),
     },
     "correlation" : {
         "title" : "Correlation heatmap",
-        "question" : "Which assets move together, and has that changed",
+        "question" : "Which assets move together, and has that changed?",
         "full" : Matthew.render,
         "preview": getattr(Matthew, "overview", None),
     },
@@ -43,7 +43,7 @@ def open_panel(key):
 def overview_card(key, info):
     number = list(PANELS).index(key) + 1
     with st.container(border=True, height=560):
-        left, right = st.columns([4, 1], vertical_alignment="top")
+        left, right = st.columns([3, 1], vertical_alignment="top")
         with left:
             st.caption(f"PANEL {number:02d}")
             st.subheader(info["title"], anchor=False)
@@ -67,7 +67,7 @@ def overview_card(key, info):
 # 4. Draw the page
 if st.session_state.focus is None:
     st.caption("PROGRAMMING PROJECT · GROUP 16")
-    st.title("Economics & Finance Dashboard", anchor=False)
+    st.title("Gold and its Drivers", anchor=False)
     st.caption("Daily data from 2015 to Oct 2026. Open any panel to explore it in full.")
     keys = list(PANELS)
     for row in (keys[:2], keys[2:]):          # two rows of two
