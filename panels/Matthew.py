@@ -58,7 +58,7 @@ def correlation_table(returns: pd.DataFrame) -> tuple:
 
 
 
-def make_heatmap(r_table, p_table, cutoff, title, pair=None):
+def make_heatmap(r_table, p_table, cutoff, title, pair=None, heading="Year by Year: How the Links Shift"):
     names = list(r_table.index)
     upper = np.triu(np.ones(r_table.shape, dtype=bool), k=1)
     sig = r_table.where(upper & (p_table.values < cutoff))
@@ -99,7 +99,7 @@ def make_heatmap(r_table, p_table, cutoff, title, pair=None):
     fig.update_layout(height=450, margin=dict(l=10, r=10, t=80, b=10),
                         paper_bgcolor="rgba(0,0,0,0)",
                         plot_bgcolor="rgba(0,0,0,0)",
-                        title=dict(text=f"<b>Which assets tend to move together></b><br>{subtitle}",
+                        title=dict(text=f"<b>{heading}</b><br>{subtitle}",
                                     x=0.01, font=dict(color=LIGHT_TEXT, size=20)))
     return fig
 
@@ -244,7 +244,7 @@ def make_animated_heatmap(returns, assets, cutoff):
     figs = {}
     for year in years:
         r_table, p_table = correlation_table(returns.loc[str(year), assets])
-        figs[year] = make_heatmap(r_table, p_table, cutoff, f"Year: {year}")
+        figs[year] = make_heatmap(r_table, p_table, cutoff, f"Year: {year}", heading="Year by Year: How the Links Shift")
     fig = go.Figure(figs[years[0]])
     fig.frames = [go.Frame(data=figs[y].data, name=str(y),
                            layout=dict(title=figs[y].layout.title)) for y in years]
@@ -287,7 +287,7 @@ def render():
     returns = get_returns().join(load_macro(), how="inner").dropna()
 
     # 1. Controls
-    view = st.radio("View", ["Correlation Heatmap", "What Changed?", "Rolling Graph", "Slideshow", "Ranking Table"], horizontal=True, key="p3_view")
+    view = st.radio("View", ["Correlation Heatmap", "What Changed?", "Rolling Graph", "Animated Timeline", "Ranking Table"], horizontal=True, key="p3_view")
     assets = st.multiselect("Assets", list(returns.columns),
                         default=["Gold", "Silver", "Oil", "S&P 500", "Real yield"],
                         key="p3_assets")
@@ -332,10 +332,11 @@ def render():
             st.plotly_chart(make_change_heatmap(before[assets], period[assets], cutoff, title,
                                             pair=(a, b)), width="stretch")
         st.caption("Blue = the pair moved apart, gold = moved closer. Hover for before/after values.")
-    elif view == "Slideshow":
+    elif view == "Animated Timeline":
         st.plotly_chart(make_animated_heatmap(returns, assets, cutoff), width="stretch")
-        st.caption("Press play to step through each calendar year. This view uses every year, "
-                   "so the time period slider doesn't apply. The year 2026 has only partial data.")
+        st.caption("Press play to see how the correlations change year by year. "
+                   "2026 covers January to October only. ")
+                    
     elif view == "Rolling Graph":
         r1, r2 = st.columns(2)
         ra = r1.selectbox("Rolling pair", assets, index=0, key="p3_roll_a")
