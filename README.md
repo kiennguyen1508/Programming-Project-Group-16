@@ -106,13 +106,13 @@ Each panel has its own "Method and Limitations" section in the app with the deta
 **Data:** Gold, silver, Brent oil and the S&P 500 from `prices.csv`, plus the VIX and copper from `macro.csv`.
 
 **What it shows:** The panel has three tabs.
-- **Performance:** how each asset grew over the chosen period, or how far it fell from its previous peak (drawdown). A table compares annual return, volatility, Sharpe ratio, Sortino ratio and maximum drawdown, with the best value in each column highlighted.
+- **Performance:** how each asset grew over the chosen period, or how far it fell from its previous peak (drawdown). A table compares annual return, volatility, Sharpe ratio and Sortino ratio (both using an assumed 4% yearly risk-free rate) and maximum drawdown, with the best value in each column highlighted.
 - **Stress days:** each asset's daily return on calm days and on stressed days. A day counts as stressed if the VIX closed at or above the chosen level the day before.
 - **Ratios:** the gold/silver, gold/oil and gold/copper ratios, and how often each one moved back towards its average after drifting far from it. The average is a rolling 5-year one, so the test only uses data that was available at the time.
 
 **Controls:** period, assets, a start-date slider, a Growth/Drawdown switch and a Replay button that animates the chart. The Stress days tab also has a VIX threshold (25 by default) and a choice between the average and the median.
 
-**Key findings:** Gold did not reliably rise after fear spikes. Over the full period it averaged +0.01% a day on the 391 stressed days, compared with +0.05% on calm days, while the S%P 500 averaged +0.13% on stressed days. The gold/silver ratio was the most predictable of the three: it moved back towards its average 81% of the time, against a base rate of about 43-57%.
+**Key findings:** Gold did not reliably rise after fear spikes. Over the full period it averaged +0.01% a day on the 391 stressed days, compared with +0.05% on calm days, while the S&P 500 averaged +0.13% on stressed days. The gold/silver ratio was the most predictable of the three: when it was more than 2σ away from its rolling 5-year average, it moved back towards that average over the next 3 months 81% of the time, against a base rate of about 43-57%.
 
 ### Matthew's panel
 
