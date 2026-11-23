@@ -64,7 +64,7 @@ def make_heatmap(r_table, p_table, cutoff, title, pair=None, heading="Which Asse
     sig = r_table.where(upper & (p_table.values < cutoff))
     ns = r_table.where(upper & (p_table.values >= cutoff)) * 0
     labels = sig.map(lambda v: "" if pd.isna(v) else f"{v:+.2f}")
-    hover = [[f"<b>{a} x {b}</b><br>r = {r_table.loc[a, b]:+.2f} <br>p = {p_table.loc[a, b]:.3f}"
+    hover = [[f"<b>{a} x {b}</b><br>r = {r_table.loc[a, b]:+.2f} <br>p = {'< 0.001' if p_table.loc[a, b] < 0.001 else f'{p_table.loc[a, b]:.3f}'}"
               for b in names] for a in names]
 
     fig = go.Figure()
@@ -80,7 +80,7 @@ def make_heatmap(r_table, p_table, cutoff, title, pair=None, heading="Which Asse
                              colorscale=GOLD_BLUE, xgap=3, ygap=3, 
                              text=labels.values, texttemplate="%{text}",
                              textfont=dict(size=14, color="white"),
-                             customdata=hover, hovertemplate="%{customdata}<extra></extra>",
+                             customdata=hover, hovertemplate="%{customdata}<extra></extra>", hoverongaps=False,
                              colorbar=dict(thickness=10, len=0.85, outlinewidth=0, tickvals=[-1, 0, 1],
                                            ticktext=["-1 Opposite", "0 Unrelated", "+1 Together"],
                                            tickfont=dict(color=SOFT_TEXT, size=11))))
@@ -347,7 +347,7 @@ def render():
         r_table, p_table = correlation_table(period[assets])
         title = f"{start:%b %Y} to {end:%b %Y}"
         st.plotly_chart(make_heatmap(r_table, p_table, cutoff, title, pair=(a,b)), width="stretch")
-        st.caption(f"{len(period)} trading days. n.s. = not significant (p >= {cutoff}).")
+        st.caption(f"{len(period)} Trading Days  |  n.s. = Not Significant (p >= {cutoff}).")
     elif view == "Animated Timeline":
         st.plotly_chart(make_animated_heatmap(returns, assets, cutoff), width="stretch")
         st.caption("Press play to see how the correlations change year by year. "
