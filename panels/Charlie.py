@@ -388,11 +388,12 @@ def answer(by_period, relationship, confidence):
         latest_copper = copper.iloc[-1]
         gold_bigger = (gold["Beta"].to_numpy() > copper["Beta"].to_numpy()).sum()
         if gold_bigger == n_periods:
-            headline = "Mostly precious."
+            headline = "Stronger estimated link with gold in every period, so silver behaved more like a precious metal."
         elif gold_bigger > 0:
-            headline = "Mixed."
+            headline = ("Mixed: stronger with gold in some periods, copper in others so silver behaved partly "
+                        "like a precious metal and partly like an industrial one.")
         else:
-            headline = "Mostly industrial."
+            headline = "Stronger estimated link with copper in every period, so silver behaved more like an industrial metal."
         text = (f"**Is silver a precious or an industrial metal?** {headline}\n\n"
                 f"In the {latest['Period']} period, holding the other metal constant, a 1% daily move in gold was associated "
                 f"with about a {latest['Beta']:.1f}% daily move in silver, and a 1% daily move in copper with about a "
@@ -409,8 +410,10 @@ def answer(by_period, relationship, confidence):
             headline = "Yes, but not in the same direction."
         elif clear < n_periods:
             headline = "Only sometimes."
-        else:
-            headline = "Yes."
+        elif negative == n_periods:
+            headline = "Yes, but in opposite directions."
+        else: 
+            headline = "Yes, in the same direction."
 
         if latest["Beta"] < 0:
             move = "fall"
