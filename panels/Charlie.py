@@ -54,7 +54,7 @@ it shows the effect of one metal holding the other constant.
 because daily return volatility is not constant over time (heteroskedasticity). The toggle switches to ordinary
 standard errors, which assume constant error variance. β̂ is the same either way; only the uncertainty changes.
 
-**Tests.** Two t-tests for each slope: H0: β = 0 (no link) and H0: β = 1 (one-for-one). The confidence interval is
+**Tests.** Two t-tests for each slope: H0: β = 0 (no link) and, for silver only, H0: β = 1 (one-for-one). The confidence interval is
 β̂ +/- t_crit x SE, at the level chosen on the slider.
 A change in β between two periods is tested with z = (β̂₂ - β̂₁) / √(SE₁² + SE₂²), treating the periods as independent samples.
 
@@ -131,6 +131,8 @@ def results_by_period(returns, y_name, regressors, period_dates, periods, alpha_
             continue
         start, end = period_dates[label]
         data = returns.loc[start:end, [y_name] + regressors].dropna()
+        if len(data) <= len(regressors) + 1:          # if not enough data points to run the regression
+            continue
         beta_hat, se, t_crit, r2, n = run_ols(data[y_name], data[regressors], alpha_level, robust)
 
         for i in range(len(regressors)):
@@ -155,7 +157,7 @@ def results_by_period(returns, y_name, regressors, period_dates, periods, alpha_
     return pd.DataFrame(rows)
 
 
-def make_scatter(returns, y_name, regressors, period_dates, periods, alpha_level=0.05):
+def make_scatter(returns, y_name, regressors, period_dates, periods):
     """
     Scatter of daily returns against gold, with a fitted line for each chosen period.
     Any other regressors are held at their average for that period.
@@ -166,7 +168,7 @@ def make_scatter(returns, y_name, regressors, period_dates, periods, alpha_level
             continue
         start, end = period_dates[label]
         data = returns.loc[start:end, [y_name] + regressors].dropna() * 100         # returns in %
-        beta_hat, se, t_crit, r2, n = run_ols(data[y_name], data[regressors], alpha_level)
+        beta_hat, se, t_crit, r2, n = run_ols(data[y_name], data[regressors])
 
         fig.add_trace(go.Scatter(
             x = data["Gold"],
@@ -244,14 +246,14 @@ def make_dot_whisker(by_period, regressors, period_dates, confidence, one_for_on
     return fig
 
 
-def make_3d(returns, y_name, regressors, period_dates, label, alpha_level=0.05):
+def make_3d(returns, y_name, regressors, period_dates, label):
     """
     3D view of the multiple regression for one period.
     Each dot is one trading day, and the flat surface is the fitted regression plane.
     """
     start, end = period_dates[label]
     data = returns.loc[start:end, [y_name] + regressors].dropna() * 100         # returns in %
-    beta_hat, se, t_crit, r2, n = run_ols(data[y_name], data[regressors], alpha_level)
+    beta_hat, se, t_crit, r2, n = run_ols(data[y_name], data[regressors])
     x1 = regressors[0]
     x2 = regressors[1]
 
@@ -478,6 +480,8 @@ def render():
     )
     if scheme == "Boom and crash":
         st.caption(f"Before: 2015-2024 | Boom: Jan 2025 to silver's peak on {SILVER_PEAK:%d %b %Y} | Crash: after the peak")
+        if y_name == "Oil":
+            st.caption("These periods are set by silver's peak, not by oil. Switch to calendar years to see 2026 on its own.")
 
     if not chosen:
         st.warning("Pick at least one period to see the results.")
@@ -489,7 +493,7 @@ def render():
 
     views = ["Scatter", "Dot and whisker"]
     if len(regressors) == 2:
-        views.append("3D plane")
+        views.insert(0, "3D plane")
 
     view = st.radio(
         "Chart",
@@ -498,16 +502,20 @@ def render():
         key = f"cha_view_{len(regressors)}",
     )
     if view == "Scatter":
-        st.plotly_chart(make_scatter(returns, y_name, regressors, period_dates, chosen, 1 - confidence))
+        st.plotly_chart(make_scatter(returns, y_name, regressors, period_dates, chosen))
+        if len(regressors) == 2:
+            st.caption("Each dot is one trading day. The lines show silver's move for each 1% move in gold, with copper held at its average.")
     elif view == "Dot and whisker":
         st.plotly_chart(make_dot_whisker(by_period, regressors, period_dates, confidence, one_for_one))
+        st.caption("Each dot is β and the line through it is the confidence interval. "
+                   "If the line crosses 0, there is no clear link.")
     else:
         which = st.selectbox(
             "Period for the 3D view",
             options = chosen,
-            key = "cha_3d",
+            key = f"cha_3d_{'_'.join(chosen)}",
         )
-        st.plotly_chart(make_3d(returns, y_name, regressors, period_dates, which, 1 - confidence))
+        st.plotly_chart(make_3d(returns, y_name, regressors, period_dates, which))
         st.caption("Drag to rotate. Each dot is one trading day, and the gold surface is the fitted regression plane.")
 
     st.markdown("**Regression results**")
