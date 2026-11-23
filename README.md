@@ -1,8 +1,8 @@
 # Gold and its Drivers: Economic & Finance Dashboard
 
-This interactive dashboard explores how the price of gold moves with other markets and economic factors between 2015 and 2026.
+**Main question:** What moves the price of gold, and has its behaviour changed since 2025?
 
-Each panel compares the years before 2025 with the period since, to see whether gold's behaviour has changed.
+This interactive dashboard looks at gold alongside silver, oil, the S&P 500 and several economic factors, using daily data from 2015 to October 2026. Each panel answers one part of the main question and compares 2015–2024 with the period since 2025.
 
 ## Quick start
 You need Python 3.12 or newer (check with `python3 --version`). Tested with Python 3.14.7 on macOS.
@@ -36,7 +36,9 @@ The dashboard opens in your browser at http://localhost:8501.
 If that port is busy, Streamlit uses the next one (8502) and prints the address in the terminal.
 
 The shared price and macro data is saved in the `data/` folder. The Distribution & Risk panel also needs trading-volume history from Yahoo Finance: run the app once while online to download and save that data. Later runs use the local cache and work without internet.
+## Using the dashboard
 
+The dashboard opens on an overview page with a preview of all four panels. Click **Open →** on any panel to see it in full with its controls, and **← Back to overview** to return. Each panel has a "Method and Limitations" section explaining how its results were calculated.
 
 ## Data
 
