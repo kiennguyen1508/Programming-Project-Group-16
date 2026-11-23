@@ -15,6 +15,8 @@ This panel compares asset-period distributions and links them to downside-risk
 statistics, tail tests, historical VaR breaches and rolling volatility.
 """
 
+import json
+
 import numpy as np
 import pandas as pd
 import streamlit as st
@@ -23,7 +25,7 @@ from plotly.subplots import make_subplots
 from scipy import stats
 from scipy.stats import gaussian_kde
 
-from data_loader import get_returns, get_macro, get_macro_changes
+from data_loader import DATA_DIR, get_returns, get_macro, get_macro_changes
 
 try:
     import yfinance as yf
@@ -58,6 +60,8 @@ VOLUME_SYMBOLS = {
     "Oil": [("BZ=F", "Brent futures volume"), ("USO", "USO ETF volume proxy")],
     "S&P 500": [("SPY", "SPY ETF volume proxy")],
 }
+VOLUME_CACHE_CSV = DATA_DIR / "volume_percentiles.csv"
+VOLUME_CACHE_SOURCES = DATA_DIR / "volume_percentiles_sources.json"
 
 METHOD_NOTES = """
 **3D volcano.** The surface is a two-dimensional Gaussian kernel density
@@ -141,7 +145,31 @@ def download_one_volume_series(symbol, start_date, end_date):
 
 @st.cache_data(ttl=86400, show_spinner=False, max_entries=20)
 def load_volume_data(start_date, end_date):
-    """Use futures volume where available; otherwise a labelled ETF proxy."""
+    """Load cached volume percentiles or download and persist them when needed."""
+    cached_volumes = None
+    cached_sources = {}
+    if VOLUME_CACHE_CSV.exists():
+        cached_volumes = pd.read_csv(
+            VOLUME_CACHE_CSV, index_col="Date", parse_dates=True
+        )
+        cached_volumes.index = pd.to_datetime(cached_volumes.index).normalize()
+        if VOLUME_CACHE_SOURCES.exists():
+            with VOLUME_CACHE_SOURCES.open(encoding="utf-8") as source_file:
+                cached_sources = json.load(source_file)
+
+        requested_start = pd.Timestamp(start_date).normalize()
+        requested_end = pd.Timestamp(end_date).normalize()
+        if (
+            not cached_volumes.empty
+            and cached_volumes.index.min()
+            <= requested_start + pd.Timedelta(days=7)
+            and cached_volumes.index.max() >= requested_end - pd.Timedelta(days=5)
+        ):
+            return (
+                cached_volumes.loc[requested_start:requested_end],
+                cached_sources,
+            )
+
     series_by_asset = {}
     source_by_asset = {}
     for asset, candidates in VOLUME_SYMBOLS.items():
@@ -164,7 +192,26 @@ def load_volume_data(start_date, end_date):
             series_by_asset[asset] = percentile
         source_by_asset[asset] = chosen_source
     if series_by_asset:
-        return pd.DataFrame(series_by_asset), source_by_asset
+        volumes = pd.DataFrame(series_by_asset)
+        if cached_volumes is not None:
+            volumes = volumes.combine_first(cached_volumes)
+            source_by_asset = {
+                **cached_sources,
+                **{
+                    asset: source
+                    for asset, source in source_by_asset.items()
+                    if source != "Unavailable"
+                },
+            }
+
+        DATA_DIR.mkdir(parents=True, exist_ok=True)
+        volumes.index.name = "Date"
+        volumes.to_csv(VOLUME_CACHE_CSV)
+        with VOLUME_CACHE_SOURCES.open("w", encoding="utf-8") as source_file:
+            json.dump(source_by_asset, source_file, indent=2)
+        return volumes, source_by_asset
+    if cached_volumes is not None:
+        return cached_volumes, cached_sources
     return pd.DataFrame(), source_by_asset
 
 

@@ -35,7 +35,7 @@ Using `python -m` makes sure the Streamlit inside the virtual environment is use
 The dashboard opens in your browser at http://localhost:8501.
 If that port is busy, Streamlit uses the next one (8502) and prints the address in the terminal.
 
-No internet connection or API key is needed to run the app. The data is already saved in the `data/` folder.
+The shared price and macro data is saved in the `data/` folder. The Distribution & Risk panel also needs trading-volume history from Yahoo Finance: run the app once while online to download and save that data. Later runs use the local cache and work without internet.
 
 
 ## Data
@@ -47,6 +47,8 @@ All data is daily, from 2 January 2015 to 30 October 2026. It comes from Yahoo F
 | `data/prices.csv` | Closing prices of gold futures (`GC=F`), silver futures (`SI=F`), Brent crude futures (`BZ=F`) and the S&P 500 (`^GSPC`). Only days when all four traded are kept. | Yahoo Finance |
 | `data/macro.csv` | US dollar index (`DX-Y.NYB`), copper futures (`HG=F`), a broad commodity ETF (`DBC`), the 10-year real yield (`DFII10`) and the VIX. Kept separate from the prices so that adding it did not change any panel's existing results. | Yahoo Finance, FRED, Cboe |
 | `data/VIX_History.csv` | Daily VIX history, used to build the VIX column in `macro.csv`. | Cboe |
+| `data/volume_percentiles.csv` | Cached, within-instrument daily volume percentiles used by the Distribution & Risk panel. Created the first time that panel loads while online. | Yahoo Finance |
+| `data/volume_percentiles_sources.json` | Labels identifying the futures volume series or ETF proxy used for each asset. | Yahoo Finance |
 
 ### Refreshing the data
 
@@ -56,6 +58,8 @@ This is optional and needs an internet connection. It overwrites the CSV files w
 python data_loader.py           # re-downloads prices.csv
 python data_loader.py macro     # re-downloads macro.csv
 ```
+
+The risk panel refreshes its volume cache when its saved history does not cover the dates in `prices.csv`. To force a refresh for the same dates, remove `data/volume_percentiles.csv` and `data/volume_percentiles_sources.json`, then restart the app while online. To run the project on another computer without internet, copy these generated cache files along with the repository's existing `data/` files.
 
 ### Using the data in a panel
 
