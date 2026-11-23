@@ -246,7 +246,14 @@ def make_volcano_3d(returns, volumes, distribution_specs, bandwidth=1.0):
         data = pd.concat(
             [r.rename("return"), v.rename("volume_percentile")], axis=1
         ).dropna()
-        if len(data) >= 50 and data["return"].std() > 0 and data["volume_percentile"].std() > 0:
+        has_enough_observations = len(data) >= 50
+        has_return_variation = data["return"].std() > 0
+        has_volume_variation = data["volume_percentile"].std() > 0
+        if (
+            has_enough_observations
+            and has_return_variation
+            and has_volume_variation
+        ):
             pairs.append((asset, period, data))
 
     if not pairs:
@@ -257,7 +264,10 @@ def make_volcano_3d(returns, volumes, distribution_specs, bandwidth=1.0):
 
     # Use the same X and Y grid for every selected distribution.
     pooled_returns = np.concatenate(
-        [item[2]["return"].to_numpy(dtype=float) * 100 for item in pairs]
+        [
+            data["return"].to_numpy(dtype=float) * 100
+            for _, _, data in pairs
+        ]
     )
     x_lo, x_hi = np.nanpercentile(pooled_returns, [0.5, 99.5])
     x_pad = max((x_hi - x_lo) * 0.15, 0.2)
