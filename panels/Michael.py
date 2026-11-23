@@ -389,6 +389,7 @@ def max_drawdown_from_log_returns(log_returns):
 
 
 def risk_statistics(series):
+    """Calculate the daily downside-risk summary for one asset period."""
     r = clean_series(series)
     if len(r) < 10:
         return None
@@ -397,7 +398,9 @@ def risk_statistics(series):
     return {
         "Observations": int(len(r)),
         "Mean daily return (%)": float(r.mean() * 100),
-        "Annualised volatility (%)": float(r.std(ddof=1) * np.sqrt(TRADING_DAYS) * 100),
+        "Annualised volatility (%)": float(
+            r.std(ddof=1) * np.sqrt(TRADING_DAYS) * 100
+        ),
         "95% VaR (%)": float(-q05 * 100),
         "95% Expected Shortfall (%)": float(-tail.mean() * 100),
         "Skewness": float(stats.skew(r, bias=False)),
@@ -459,6 +462,7 @@ def make_rolling_volatility(returns, assets, window=30):
 
 
 def tests_table(returns, assets):
+    """Compare pre-2025 and post-2024 distributions for each selected asset."""
     before = period_slice(returns, "2015–2024")
     after = period_slice(returns, "Since 2025")
     rows = []
@@ -467,15 +471,22 @@ def tests_table(returns, assets):
         if len(x) >= 30 and len(y) >= 20:
             ks = stats.ks_2samp(x, y)
             lev = stats.levene(x, y, center="median")
-            rows.append({
-                "Asset": asset, "KS statistic": ks.statistic, "KS p-value": ks.pvalue,
-                "Levene statistic": lev.statistic, "Levene p-value": lev.pvalue,
-                "Pre-2025 n": len(x), "Post-2024 n": len(y)
-            })
+            rows.append(
+                {
+                    "Asset": asset,
+                    "KS statistic": ks.statistic,
+                    "KS p-value": ks.pvalue,
+                    "Levene statistic": lev.statistic,
+                    "Levene p-value": lev.pvalue,
+                    "Pre-2025 n": len(x),
+                    "Post-2024 n": len(y),
+                }
+            )
     return pd.DataFrame(rows)
 
 
 def var_breach_table(returns, assets):
+    """Test post-2024 returns against each asset's 2015–2024 95% VaR."""
     before = period_slice(returns, "2015–2024")
     after = period_slice(returns, "Since 2025")
     rows = []
@@ -484,12 +495,16 @@ def var_breach_table(returns, assets):
         if len(base) >= 100 and len(later) >= 20:
             threshold = base.quantile(0.05)
             breach = later < threshold
-            rows.append({
-                "Asset": asset, "Historical 95% VaR loss (%)": -threshold * 100,
-                "Post-2024 breach rate (%)": breach.mean() * 100,
-                "Expected breach rate (%)": 5.0, "Breach days": int(breach.sum()),
-                "Post-2024 observations": len(later)
-            })
+            rows.append(
+                {
+                    "Asset": asset,
+                    "Historical 95% VaR loss (%)": -threshold * 100,
+                    "Post-2024 breach rate (%)": breach.mean() * 100,
+                    "Expected breach rate (%)": 5.0,
+                    "Breach days": int(breach.sum()),
+                    "Post-2024 observations": len(later),
+                }
+            )
     return pd.DataFrame(rows)
 
 
