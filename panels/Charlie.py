@@ -23,12 +23,27 @@ RELATIONSHIPS = {"Silver vs Gold": ("Silver", ["Gold"]),
                  "Silver vs Gold + Copper": ("Silver", ["Gold", "Copper"]),
                  "Oil vs Gold": ("Oil", ["Gold"])}
 
-RELATIONSHIP_NOTES = {"Silver vs Gold": "How did silver react to gold's movements? β is silver's average move for each "
-                                        "1% move in gold, so a β above 1 means silver's moves were bigger than gold's.",
-                      "Silver vs Gold + Copper": "Is silver a precious metal like gold, or an industrial metal like copper? "
-                                                 "Each β shows silver's link to one metal, holding the other constant.",
-                      "Oil vs Gold": "Did oil and gold move together, and did that change during the 2026 Iran tension? "
-                                     "A β near 0 means no link."}
+RELATIONSHIP_NOTES = {"Silver vs Gold": "How did silver react to gold's movements?",
+                      "Silver vs Gold + Copper": "Is silver a precious metal like gold, or an industrial metal like copper?",
+                      "Oil vs Gold": "Did oil and gold move together, and did that change during the 2026 Iran tension?"}
+
+BETA_NOTES = {"Silver vs Gold": "β is silver's average daily move for each 1% daily move in gold. β = 1 means one-for-one, "
+                                "above 1 means silver's moves were bigger than gold's and below 1 means smaller. If the "
+                                "confidence interval includes 1, silver was not clearly different from one-for-one.",
+              "Silver vs Gold + Copper": "There is one β for each metal: silver's average daily move for a 1% daily move "
+                                         "in that metal, holding the other metal constant. The bigger β shows which "
+                                         "metal silver tracked more closely.",
+              "Oil vs Gold": "β is oil's average daily move for each 1% daily move in gold. A positive β means they moved "
+                             "in the same direction, a negative β in opposite directions. If the confidence interval "
+                             "includes 0, there is no clear link."}
+
+CAVEATS = {"Silver vs Gold": "These are same-day associations. They show how much silver amplified gold's moves, "
+                               "not that gold caused them, and they do not forecast future returns.",
+           "Silver vs Gold + Copper": "Comparing the two βs suggests whether silver behaved more like a precious or an "
+                                        "industrial metal, but it is not a formal test. Copper is also more volatile "
+                                        "than gold, which makes its β look smaller.",
+           "Oil vs Gold": "A link found in one period should not be assumed to hold in another. These are same-day "
+                            "associations, not causes, and they do not forecast future returns."}
 
 ONE_FOR_ONE = {"Silver vs Gold": True,
                "Silver vs Gold + Copper": True,
@@ -337,11 +352,14 @@ def describe(row, y_name, regressors, confidence, one_for_one=True):
             f"({confidence:.0%} CI {row['CI low']:.2f} to {row['CI high']:.2f}). This is {verdict}.")
 
 
-def compare(by_period, y_name, name, confidence):
+def compare(by_period, y_name, name, confidence, one_for_one=True, significant_only=False):
     """
-    z-test for whether one beta changed from each period to the next.
+    z-test for whether beta changed from one period to the next.
+    Set significant_only to only keep the changes that are significant.
     """
     rows = by_period[by_period["Regressor"] == name]
+    y = y_name.lower()
+    x = name.lower()
     alpha_level = 1 - confidence
     z_crit = stats.norm.ppf(1 - alpha_level / 2)
     lines = []
@@ -349,17 +367,85 @@ def compare(by_period, y_name, name, confidence):
         earlier = rows.iloc[i - 1]
         later = rows.iloc[i]
         z = (later["Beta"] - earlier["Beta"]) / np.sqrt(earlier["Std. Error"] ** 2 + later["Std. Error"] ** 2)
+        if significant_only and abs(z) <= z_crit:
+            continue
 
-        if z > z_crit:
-            result = "a significant rise"
+        if z > z_crit and one_for_one:
+            result = f"a significant rise at the {confidence:.0%} level, so {y} reacted more to each move in {x}"
+        elif z > z_crit:
+            result = f"a significant rise at the {confidence:.0%} level, so {y} moved more with {x}, or less against it"
+        elif z < -z_crit and one_for_one:
+            result = f"a significant fall at the {confidence:.0%} level, so {y} reacted less to each move in {x}"
         elif z < -z_crit:
-            result = "a significant fall"
+            result = f"a significant fall at the {confidence:.0%} level, so {y} moved less with {x}, or more against it"
         else:
             result = "not a significant change"
 
-        lines.append(f"**{earlier['Period']} to {later['Period']}:** {y_name.lower()}'s β on {name.lower()} went from "
-                     f"{earlier['Beta']:.2f} to {later['Beta']:.2f} (z = {z:.2f}), {result} at the {confidence:.0%} level.")
+        lines.append(f"**{earlier['Period']} to {later['Period']}:** {y}'s β on {x} went from "
+                     f"{earlier['Beta']:.2f} to {later['Beta']:.2f} (z = {z:.2f}), {result}.")
     return lines
+
+
+def gold_copper_table(by_period):
+    """
+    Small table of silver's beta on gold and copper for each period within what results mean, so it's easier to read.
+    """
+    rows = []
+    for period in by_period["Period"].unique():
+        in_period = by_period[by_period["Period"] == period]
+        gold = in_period[in_period["Regressor"] == "Gold"].iloc[0]
+        copper = in_period[in_period["Regressor"] == "Copper"].iloc[0]
+        if gold["Beta"] > copper["Beta"]:
+            closer = "Gold"
+        else:
+            closer = "Copper"
+        rows.append({"Period": period,
+                     "β on gold": round(gold["Beta"], 2),
+                     "β on copper": round(copper["Beta"], 2),
+                     "Silver moved more with": closer})
+    return pd.DataFrame(rows)
+
+
+def takeaway(by_period, relationship):
+    """
+    What the results mean in practice, shown in the green box.
+    """
+    gold = by_period[by_period["Regressor"] == "Gold"]
+    latest = gold.iloc[-1]
+
+    if relationship == "Silver vs Gold":
+        if (gold["CI low"] > 1).sum() > 0:
+            text = ("Silver acted like a geared version of gold: when gold moved, silver tended to move further in "
+                    "the same direction. For someone holding silver, that means bigger gains when gold rises and "
+                    "bigger losses when it falls, which fits silver's boom and crash both being larger than gold's.")
+        else:
+            text = "Silver did not clearly move more than gold here, so holding silver was not clearly riskier than gold."
+
+    elif relationship == "Silver vs Gold + Copper":
+        copper = by_period[by_period["Regressor"] == "Copper"]
+        gold_bigger = (gold["Beta"].to_numpy() > copper["Beta"].to_numpy()).sum()
+        if gold_bigger == len(gold):
+            text = ("Even with industrial demand behind part of the boom, silver still tracked gold more than copper, "
+                    "so it traded more like a precious metal than an industrial one.")
+        elif gold_bigger > 0:
+            text = "Silver switched between tracking gold and copper, so whether it trades as precious or industrial depends on the period."
+        else:
+            text = "Silver tracked copper more than gold, so it traded more like an industrial metal than a precious one."
+
+    else:
+        if latest["CI high"] < 0:
+            text = (f"In {latest['Period']}, days when gold rose tended to be days when oil fell. Holding both would "
+                    "have offset some risk, because one tended to rise when the other fell.")
+        elif latest["CI low"] > 0:
+            text = (f"In {latest['Period']}, oil and gold tended to rise and fall together, so holding both gave "
+                    "little protection against a fall in either.")
+        else:
+            text = f"In {latest['Period']}, gold's daily move told us little about oil's, so they moved largely independently."
+
+        if latest["R²"] < 0.05 and (latest["CI high"] < 0 or latest["CI low"] > 0):
+            text = text + (f" The link was weak, though: gold's moves explained only about {latest['R²']:.0%} of oil's "
+                           "daily moves.")
+    return text
 
 
 def answer(by_period, relationship, confidence):
@@ -390,7 +476,7 @@ def answer(by_period, relationship, confidence):
         if gold_bigger == n_periods:
             headline = "Stronger estimated link with gold in every period, so silver behaved more like a precious metal."
         elif gold_bigger > 0:
-            headline = ("Mixed: stronger with gold in some periods, copper in others so silver behaved partly "
+            headline = ("Mixed: stronger with gold in some periods, copper in others, so silver behaved partly "
                         "like a precious metal and partly like an industrial one.")
         else:
             headline = "Stronger estimated link with copper in every period, so silver behaved more like an industrial metal."
@@ -412,7 +498,7 @@ def answer(by_period, relationship, confidence):
             headline = "Only sometimes."
         elif negative == n_periods:
             headline = "Yes, but in opposite directions."
-        else: 
+        else:
             headline = "Yes, in the same direction."
 
         if latest["Beta"] < 0:
@@ -555,11 +641,45 @@ def render():
     )
 
     with st.expander("What the results mean", expanded = True):
-        for i in range(len(by_period)):
-            st.markdown(describe(by_period.iloc[i], y_name, regressors, confidence, one_for_one))
+        st.markdown("##### What β tells us")
+        st.markdown(BETA_NOTES[relationship])
+
+        st.markdown("##### Results by period")
+        if len(regressors) == 1:
+            lines = []
+            for i in range(len(by_period)):
+                lines.append("- " + describe(by_period.iloc[i], y_name, regressors, confidence, one_for_one))
+            st.markdown("\n".join(lines))
+        else:
+            st.dataframe(gold_copper_table(by_period), hide_index = True)
+
+        st.markdown("##### What changed between periods")
+        changes = []
         for name in regressors:
-            for line in compare(by_period, y_name, name, confidence):
-                st.markdown(line)
+            changes = changes + compare(by_period, y_name, name, confidence, one_for_one, significant_only = True)
+        if len(ran) < 2:
+            st.markdown("Pick more than one period to test whether β changed.")
+        elif changes:
+            st.markdown("\n".join("- " + line for line in changes))
+        else:
+            st.markdown(f"No β changed significantly between periods at the {confidence:.0%} level, "
+                        "so the differences could be down to chance.")
+
+        boom_and_crash = ("Boom" in ran and "Crash" in ran) or ("2025" in ran and "2026 YTD" in ran)
+        if relationship == "Silver vs Gold" and boom_and_crash:
+            st.caption("Why might β dip in the boom and jump after the peak? β measures how far silver moved with gold "
+                       "on the same day, not how much it rose overall. In the boom, much of silver's rise came from its "
+                       "own drivers, such as industrial demand and tight supply, so its daily link to gold weakened. "
+                       "After the peak, both sold off together and silver fell further. These are likely reasons, not "
+                       "something the regression tests.")
+
+        st.markdown("##### What to take away")
+        st.success(takeaway(by_period, relationship))
+        st.caption(CAVEATS[relationship])
+        if scheme == "Calendar years":
+            st.caption(f"Calendar years cut at 31 Dec 2025, so the weeks just before silver's peak on "
+                       f"{SILVER_PEAK:%d %b %Y} fall in 2026 YTD instead of 2025. That is why these results can "
+                       "differ from the boom and crash split.")
 
     with st.expander("Method and limitations"):
         st.markdown(METHOD_NOTES)
