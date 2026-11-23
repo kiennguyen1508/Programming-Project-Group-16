@@ -61,8 +61,10 @@ A change in β between two periods is tested with z = (β̂₂ - β̂₁) / √(
 **Limitations.**
 - The regression shows association, not causation. It describes how silver moved with gold on the same day;
   it does not forecast future returns or show that gold causes silver to move.
-- Daily returns have fat tails, so a few extreme days (such as the large falls after silver's peak) can pull β̂ up.
-  The robust standard errors make the intervals wider to reflect this.
+- Daily returns have fat tails, so a few extreme days (such as the large falls after silver's peak) can have a big
+  influence on β̂. Robust standard errors allow for changing volatility, but they do not remove the effect of these days.
+- The standard errors assume each day's error is unrelated to the next day's. Robust standard errors do not correct
+  for autocorrelation, although daily returns usually show little of it.
 - The Boom and Crash periods are much shorter than Before, so their estimates are less precise.
 - Brent crude and the metals do not close at exactly the same time each day, which can bias daily betas towards zero.
 - Futures prices jump slightly when contracts roll over.
@@ -177,7 +179,7 @@ def make_scatter(returns, y_name, regressors, period_dates, periods):
             name = label,
             legendgroup = label,
             showlegend = False,
-            marker = dict(size = 4, opacity = 0.3, color = PERIOD_COLOURS[label]),
+            marker = dict(size = 4, opacity = 0.7, color = PERIOD_COLOURS[label]),
         ))
 
         line_x = np.array([data["Gold"].min(), data["Gold"].max()])
@@ -269,7 +271,7 @@ def make_3d(returns, y_name, regressors, period_dates, label):
         z = data[y_name],
         mode = "markers",
         name = "Daily returns",
-        marker = dict(size = 2, opacity = 0.5, color = PERIOD_COLOURS[label]),
+        marker = dict(size = 2, opacity = 0.7, color = PERIOD_COLOURS[label]),
     ))
     fig.add_trace(go.Surface(
         x = grid_1,
@@ -305,7 +307,7 @@ def describe(row, y_name, regressors, confidence, one_for_one=True):
     held = ""
     for other in regressors:
         if other != name:
-            held = f", holding {other.lower()} constant"
+            held = f", holding {other.lower()} constant,"
 
     if row["Beta"] < 0:
         direction = "fall"
@@ -330,8 +332,8 @@ def describe(row, y_name, regressors, confidence, one_for_one=True):
     else:
         verdict = "not clearly different from zero"
 
-    return (f"**{row['Period']}:** a 1% rise in {name.lower()}{held} was associated with about a "
-            f"{abs(row['Beta']):.2f}% {direction} in {y_name.lower()} on average "
+    return (f"**{row['Period']}:** a 1% daily rise in {name.lower()}{held} was associated with about a "
+            f"{abs(row['Beta']):.2f}% daily {direction} in {y_name.lower()} on average "
             f"({confidence:.0%} CI {row['CI low']:.2f} to {row['CI high']:.2f}). This is {verdict}.")
 
 
@@ -377,8 +379,8 @@ def answer(by_period, relationship, confidence):
         else:
             headline = "Not clearly more strongly than gold."
         text = (f"**How did silver react to gold's movements?** {headline}\n\n"
-                f"In the {latest['Period']} period, a 1% move in gold was associated with about a "
-                f"{latest['Beta']:.1f}% move in silver on average. Silver's moves were significantly bigger "
+                f"In the {latest['Period']} period, a 1% daily move in gold was associated with about a "
+                f"{latest['Beta']:.1f}% daily move in silver on average. Silver's moves were significantly bigger "
                 f"than gold's in {above} of {n_periods} periods, at the {confidence:.0%} confidence level.")
 
     elif relationship == "Silver vs Gold + Copper":
@@ -392,8 +394,8 @@ def answer(by_period, relationship, confidence):
         else:
             headline = "Mostly industrial."
         text = (f"**Is silver a precious or an industrial metal?** {headline}\n\n"
-                f"In the {latest['Period']} period, holding the other metal constant, a 1% move in gold was associated "
-                f"with about a {latest['Beta']:.1f}% move in silver, and a 1% move in copper with about a "
+                f"In the {latest['Period']} period, holding the other metal constant, a 1% daily move in gold was associated "
+                f"with about a {latest['Beta']:.1f}% daily move in silver, and a 1% daily move in copper with about a "
                 f"{latest_copper['Beta']:.1f}% move. Silver moved more with gold than with copper in "
                 f"{gold_bigger} of {n_periods} periods.")
 
@@ -415,8 +417,8 @@ def answer(by_period, relationship, confidence):
         else:
             move = "rise"
         text = (f"**Did oil and gold move together?** {headline}\n\n"
-                f"In the {latest['Period']} period, a 1% rise in gold was associated with about a "
-                f"{abs(latest['Beta']):.1f}% {move} in oil on average. The link was significantly different from zero in "
+                f"In the {latest['Period']} period, a 1% daily rise in gold was associated with about a "
+                f"{abs(latest['Beta']):.1f}% daily {move} in oil on average. The link was significantly different from zero in "
                 f"{clear} of {n_periods} periods, at the {confidence:.0%} confidence level.")
     return text
 
@@ -433,23 +435,27 @@ def render():
 
     returns = load_returns()
 
-    relationship = st.radio(
+    relationship = st.segmented_control(
         "Relationship",
         options = list(RELATIONSHIPS),
-        horizontal = True,
+        default = "Silver vs Gold",
         key = "cha_rel",
     )
+    if relationship is None:
+        relationship = "Silver vs Gold"
     y_name, regressors = RELATIONSHIPS[relationship]
     st.caption(RELATIONSHIP_NOTES[relationship])
 
     col_split, col_conf, col_robust = st.columns([2, 1, 1], vertical_alignment = "bottom")
     with col_split:
-        scheme = st.radio(
+        scheme = st.segmented_control(
             "Split the data by",
             options = ["Boom and crash", "Calendar years"],
-            horizontal = True,
+            default = "Boom and crash",
             key = "cha_scheme",
         )
+        if scheme is None:
+            scheme = "Boom and crash"
     with col_conf:
         confidence = st.select_slider(
             "Confidence level",
@@ -463,7 +469,7 @@ def render():
         robust = st.toggle(
             "Robust standard errors (White)",
             value = True,
-            help = "Allows for some days being much more volatile than others. It widens the confidence intervals; β does not change.",
+            help = "Allows for some days being much more volatile than others. Only the standard errors and confidence intervals change; β does not change.",
             key = "cha_robust",
         )
 
@@ -472,9 +478,10 @@ def render():
     else:
         period_dates = YEARS
 
-    chosen = st.multiselect(
+    chosen = st.pills(
         "Periods",
         options = list(period_dates),
+        selection_mode = "multi",
         default = list(period_dates),
         key = f"cha_per_{scheme}",
     )
@@ -495,16 +502,18 @@ def render():
     if len(regressors) == 2:
         views.insert(0, "3D plane")
 
-    view = st.radio(
+    view = st.segmented_control(
         "Chart",
         options = views,
-        horizontal = True,
+        default = views[0],
         key = f"cha_view_{len(regressors)}",
     )
+    if view is None:
+        view = views[0]
     if view == "Scatter":
         st.plotly_chart(make_scatter(returns, y_name, regressors, period_dates, chosen))
         if len(regressors) == 2:
-            st.caption("Each dot is one trading day. The lines show silver's move for each 1% move in gold, with copper held at its average.")
+            st.caption("Each dot is one trading day. The lines show silver's move for each 1% daily move in gold, with copper held at its average.")
     elif view == "Dot and whisker":
         st.plotly_chart(make_dot_whisker(by_period, regressors, period_dates, confidence, one_for_one))
         st.caption("Each dot is β and the line through it is the confidence interval. "
@@ -517,6 +526,8 @@ def render():
         )
         st.plotly_chart(make_3d(returns, y_name, regressors, period_dates, which))
         st.caption("Drag to rotate. Each dot is one trading day, and the gold surface is the fitted regression plane.")
+
+    st.info(answer(by_period, relationship, confidence))
 
     st.markdown("**Regression results**")
     if robust:
@@ -534,8 +545,6 @@ def render():
         mime = "text/csv",
         key = "cha_download",
     )
-
-    st.info(answer(by_period, relationship, confidence))
 
     with st.expander("What the results mean", expanded = True):
         for i in range(len(by_period)):
@@ -560,5 +569,5 @@ def overview():
     fig.update_layout(height = 300, xaxis_title = None, margin = dict(l=10, r=10, t=30, b=0))
     fig.update_yaxes(showticklabels = False)
     st.plotly_chart(fig, config = {"staticPlot": True}, key = "cha_overview_chart")
-    st.caption(f"After silver's peak on {SILVER_PEAK:%d %b %Y}, a 1% move in gold was associated "
-               f"with about a {crash_beta:.1f}% move in silver")
+    st.caption(f"After silver's peak on {SILVER_PEAK:%d %b %Y}, a 1% daily move in gold was associated "
+               f"with about a {crash_beta:.1f}% daily move in silver")
