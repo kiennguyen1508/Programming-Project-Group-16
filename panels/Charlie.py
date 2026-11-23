@@ -525,6 +525,8 @@ def render():
         st.plotly_chart(make_3d(returns, y_name, regressors, period_dates, which))
         st.caption("Drag to rotate. Each dot is one trading day, and the gold surface is the fitted regression plane.")
 
+    st.info(answer(by_period, relationship, confidence))
+
     st.markdown("**Regression results**")
     if robust:
         st.caption(f"Confidence intervals at the {confidence:.0%} level, using White robust standard errors")
@@ -541,8 +543,6 @@ def render():
         mime = "text/csv",
         key = "cha_download",
     )
-
-    st.info(answer(by_period, relationship, confidence))
 
     with st.expander("What the results mean", expanded = True):
         for i in range(len(by_period)):
