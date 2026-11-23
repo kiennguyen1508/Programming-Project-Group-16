@@ -1,0 +1,7 @@
+{
+  "Gold": "Gold futures volume",
+  "Silver": "Silver futures volume",
+  "Copper": "COMEX copper futures volume",
+  "Oil": "Brent futures volume",
+  "S&P 500": "SPY ETF volume proxy"
+}
