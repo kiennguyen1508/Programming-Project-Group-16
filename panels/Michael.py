@@ -230,6 +230,7 @@ def period_slice(data, period):
         return data.loc[data.index >= SPLIT_DATE]
     return data.iloc[0:0]
 
+
 def make_volcano_3d(returns, volumes, distribution_specs, bandwidth=1.0):
     """
     Draw one or two genuine 3D joint-distribution surfaces.
@@ -378,6 +379,7 @@ def make_volcano_3d(returns, volumes, distribution_specs, bandwidth=1.0):
     )
     return fig, None
 
+
 def max_drawdown_from_log_returns(log_returns):
     r = clean_series(log_returns)
     if r.empty:
@@ -402,6 +404,7 @@ def risk_statistics(series):
         "Excess kurtosis": float(stats.kurtosis(r, fisher=True, bias=False)),
         "Maximum drawdown (%)": float(max_drawdown_from_log_returns(r) * 100),
     }
+
 
 def risk_table(returns, assets, periods):
     rows = []
