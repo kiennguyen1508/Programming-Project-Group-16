@@ -393,7 +393,6 @@ def risk_statistics(series):
         "Maximum drawdown (%)": float(max_drawdown_from_log_returns(r) * 100),
     }
 
-
 def risk_table(returns, assets, periods):
     rows = []
     for period in periods:
@@ -658,7 +657,7 @@ def render():
         "KS tests compare full return distributions; Levene tests compare "
         "variances. Standard p-values assume independent observations. Daily "
         "financial returns can be volatility-clustered, so treat these as "
-        "indicative and interpret them with the graph and effect sizes."
+        "indicative and interpret them with the graph and effect size."
     )
 
     st.markdown("### 6. Methodology and limitations")
@@ -706,3 +705,4 @@ def overview():
             legend=dict(orientation="h", y=1.12)
         )
         st.plotly_chart(fig, width="stretch", key="p4_volcano_overview")
+
