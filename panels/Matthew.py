@@ -426,7 +426,7 @@ for the chosen period, and cells that could be down to chance (with p-values
 above the cutoff that you select from 0.01 to 0.20 (for now)) are hidden.
 Correlation is not causation, and short periods give less reliable results etc etc.
 This is just a test paragraph for now, I'm not sure if this is necessary. 
-More detail can be added later if we decide.
+More detail can be added later if we decide...
 """)
 
 
