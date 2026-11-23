@@ -126,6 +126,11 @@ Each panel has its own "Method and Limitations" section in the app with the deta
 Gold, Silver, Oil and the S&P 500 use daily log returns. The other assets use the daily percentage change, apart from the real yield, which uses the daily change in percentage points. In certain trading days, there is not complete data on each of the analysed and used assets. In these cases, the trading day as a whole is excluded, leaving apporximately 
 2,900 complete trading days from Jan 2015, to October 2026, which my panel uses.
 
+**What Panel 3 Shows:**
+- ***Correlation Heatmap:*** A staircase heatmap of the Pearson correlation (r) for every pair of chosen assets. Gold means the pair moves together and blue means they move in opposite directions. Pairs that are not significant at the chosen level are greyed out and marked "n.s.", so the eye goes only to the links that are real.
+- ***Rolling Graph:*** How the correlation between two assets changes over time, with a shaded 95% confidence band. Shaded boxes mark the COVID crash, the Ukraine war and rate hikes, and the selected period. A dotted line marks the silver peak (26 Jan 2026). Dotted average lines compare before and during the selected period, and a row of cards shows the latest, average, lowest and highest r. A second pair can be added for comparison.
+- ***Animated Timeline:*** One heatmap per year from 2015 to 2026, played with a Play button or a year slider, to show how the links shift year by year. 2026 covers January to October only.
+- ***Decoupling Analysis:*** Compares the selected period with all the days before it. A table ranks every pair by how much its correlation changed, with a Fisher z-test p-value for each change, and can be downloaded as a CSV. It can also be shown as a heatmap of the changes. The "Pair in Focus" section then tests one chosen pair and says in plain words whether the change is real or just random noise.
 ###  Panel 4: Michael's panel
 
 ## Contributions
