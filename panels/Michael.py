@@ -298,6 +298,7 @@ def load_volume_data(start_date, end_date):
 
 
 def clean_series(series):
+    """Convert values to finite numbers and omit missing observations."""
     return pd.to_numeric(series, errors="coerce").replace([np.inf, -np.inf], np.nan).dropna()
 
 
