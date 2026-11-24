@@ -1,31 +1,31 @@
 import streamlit as st
 from panels import Charlie, Kien, Matthew, Michael
 
-st.set_page_config(page_title="Gold and its Drivers", layout="wide")
+st.set_page_config(page_title="What Drives Gold? An Interactive Analysis of Returns, Correlations, Risk and Market Links: 2015-2026.", layout="wide")
 
 # 1. One entry per panel: its title, the quesion it answers,
 #    and the function that draws the full panel
 PANELS = {
     "regression" : {
-        "title" : "Regression analysis: silver, oil and gold",
+        "title" : "Regression Analysis: Silver, Oil and Gold",
         "question" : "How much does silver move with gold, and did that change through its boom and crash?",
         "full" : Charlie.render,
         "preview": getattr(Charlie, "overview", None),
     },
     "performance" : {
-        "title" : "Performance and ratios",
+        "title" : "Performance and Ratios",
         "question" : "How has gold performed, and does it protect investors when markets are stressed?",
         "full" : Kien.render,
         "preview": getattr(Kien, "overview", None),
     },
     "correlation" : {
-        "title" : "Correlation heatmap",
+        "title" : "Correlation Heatmap",
         "question" : "Which assets move together, and has that changed?",
         "full" : Matthew.render,
         "preview": getattr(Matthew, "overview", None),
     },
     "risk" : {
-        "title" : "Distribution and risk",
+        "title" : "Distribution and Risk",
         "question" : "How bad is a bad day for gold?",
         "full": getattr(Michael, "render", lambda: st.info("Michael's panel is not ready yet.")),
         "preview": getattr(Michael, "overview", None),
