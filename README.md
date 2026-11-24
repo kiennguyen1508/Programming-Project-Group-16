@@ -177,7 +177,7 @@ Volume histories are cached locally in `data/volume_history.csv`, so once downlo
 |---|---|---|
 | Charlie | Silver vs gold regression | write this later |
 | Kien Nguyen | Performance & ratios | Set up the repository and folder structure; built `data_loader.py` (price download, `get_prices()`, `get_returns()`) and later added the macro data (`get_macro()`, `get_macro_changes()`); built the overview grid in `app.py` and the dark theme; wrote the README apart from the other panel sections; kept `requirements.txt` up to date |
-| Matthew Herbert | Correlation heatmap | write this later |
+| Matthew Herbert | Correlation heatmap | Built Panel 3 (`panels/Matthew.py`): the significance-masked correlation heatmap, the rolling correlation graph with confidence bands and event shading, the year-by-year animated timeline, and the Decoupling Analysis with Fisher z-tests and the ranked change table. Wrote README for Panel 3. Assisted in layout of dashboard. Troubleshoot email relating to commits and later push/pull problems. Debugging. |
 | Michael Gilgunn | Distribution & risk | write this later|
 
 ## Limitations
