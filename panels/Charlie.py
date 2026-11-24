@@ -455,36 +455,49 @@ def answer(by_period, relationship, confidence):
     gold = by_period[by_period["Regressor"] == "Gold"]
     n_periods = len(gold)
     latest = gold.iloc[-1]
+    if n_periods > 1:
+        every = " in every period"
+    else:
+        every = ""
 
     if relationship == "Silver vs Gold":
         above = (gold["CI low"] > 1).sum()
         if above == n_periods:
-            headline = "More strongly than gold in every period."
+            headline = f"More strongly than gold{every}."
         elif above > 0:
             headline = "More strongly than gold in some periods."
         else:
             headline = "Not clearly more strongly than gold."
+        if n_periods > 1:
+            evidence = f"Silver's moves were significantly bigger than gold's in {above} of {n_periods} periods"
+        elif above == 1:
+            evidence = "Silver's moves were significantly bigger than gold's"
+        else:
+            evidence = "Silver's moves were not significantly bigger than gold's"
         text = (f"**How did silver react to gold's movements?** {headline}\n\n"
                 f"In the {latest['Period']} period, a 1% daily move in gold was associated with about a "
-                f"{latest['Beta']:.1f}% daily move in silver on average. Silver's moves were significantly bigger "
-                f"than gold's in {above} of {n_periods} periods, at the {confidence:.0%} confidence level.")
+                f"{latest['Beta']:.1f}% daily move in silver on average. {evidence}, at the {confidence:.0%} "
+                f"confidence level.")
 
     elif relationship == "Silver vs Gold + Copper":
         copper = by_period[by_period["Regressor"] == "Copper"]
         latest_copper = copper.iloc[-1]
         gold_bigger = (gold["Beta"].to_numpy() > copper["Beta"].to_numpy()).sum()
         if gold_bigger == n_periods:
-            headline = "Stronger estimated link with gold in every period, so silver behaved more like a precious metal."
+            headline = f"Stronger estimated link with gold{every}, so silver behaved more like a precious metal."
         elif gold_bigger > 0:
             headline = ("Mixed: stronger with gold in some periods, copper in others, so silver behaved partly "
                         "like a precious metal and partly like an industrial one.")
         else:
-            headline = "Stronger estimated link with copper in every period, so silver behaved more like an industrial metal."
+            headline = f"Stronger estimated link with copper{every}, so silver behaved more like an industrial metal."
+        if n_periods > 1:
+            evidence = f" Silver moved more with gold than copper in {gold_bigger} of {n_periods} periods."
+        else:
+            evidence = ""
         text = (f"**Is silver a precious or an industrial metal?** {headline}\n\n"
                 f"In the {latest['Period']} period, holding the other metal constant, a 1% daily move in gold was associated "
                 f"with about a {latest['Beta']:.1f}% daily move in silver, and a 1% daily move in copper with about a "
-                f"{latest_copper['Beta']:.1f}% move. Silver moved more with gold than with copper in "
-                f"{gold_bigger} of {n_periods} periods.")
+                f"{latest_copper['Beta']:.1f}% move.{evidence}")
 
     else:
         positive = (gold["CI low"] > 0).sum()
@@ -505,10 +518,16 @@ def answer(by_period, relationship, confidence):
             move = "fall"
         else:
             move = "rise"
+        if n_periods > 1:
+            evidence = f"The link was significantly different from zero in {clear} of {n_periods} periods"
+        elif clear == 1:
+            evidence = "The link was significantly different from zero"
+        else:
+            evidence = "The link was not significantly different from zero"
         text = (f"**Did oil and gold move together?** {headline}\n\n"
                 f"In the {latest['Period']} period, a 1% daily rise in gold was associated with about a "
-                f"{abs(latest['Beta']):.1f}% daily {move} in oil on average. The link was significantly different from zero in "
-                f"{clear} of {n_periods} periods, at the {confidence:.0%} confidence level.")
+                f"{abs(latest['Beta']):.1f}% daily {move} in oil on average. {evidence}, at the {confidence:.0%} "
+                f"confidence level.")
     return text
 
 
