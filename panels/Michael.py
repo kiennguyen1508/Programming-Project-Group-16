@@ -234,10 +234,10 @@ def period_slice(data, period):
 
 def make_joint_distribution_3d(returns, volumes, distribution_specs, bandwidth=1.0):
     """
-    Draw one or two genuine 3D joint-distribution surfaces.
-    Each surface is a 2D KDE: X=daily return, Y=relative trading volume,
-    Z=joint probability density. Comparisons are side-by-side, never stacked
-    on top of one another, so the shape of each distribution remains visible.
+    Create 3D KDE surfaces for one or two asset-period distributions.
+
+    The axes represent daily return, relative trading-volume percentile, and
+    estimated joint probability density. Comparisons use separate scenes.
     """
     pairs = []
     for asset, period in distribution_specs:
