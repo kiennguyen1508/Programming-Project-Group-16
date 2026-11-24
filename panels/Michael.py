@@ -150,3 +150,152 @@ def load_shared_data():
         frame.sort_index(inplace=True)
 
     if 'Copper' not in returns.columns:
+        if 'Copper' in macro_changes.columns:
+            returns = returns.join(macro_changes['Copper'].rename('Copper'), how='left')
+        elif 'Copper' in macro.columns:
+            copper = pd.to_numeric(macro['Copper'], errors='coerce')
+            log_returns = np.log(copper.where(copper > 0)).diff()
+            returns = returns.join(log_returns.rename('Copper'), how='left')
+    returns = returns.apply(pd.to_numeric, errors='coerce')
+    returns = returns.replace([np.inf, -np.inf], np.nan)
+    return returns
+
+
+def download_one_volume_series(symbol, start_date, end_date):
+    """Download daily volume for one Yahoo Finance symbol."""
+    if yf is None:
+        LOGGER.warning('Cannot download %s volume: yfinance is not installed.', symbol)
+        return pd.Series(dtype=float, name=symbol)
+    try:
+        hist = yf.Ticker(symbol).history(start=start_date, end=end_date, auto_adjust=False, actions=False)
+        if hist.empty or 'Volume' not in hist.columns:
+            return pd.Series(dtype=float, name=symbol)
+        volume = pd.to_numeric(hist['Volume'], errors='coerce')
+        idx = pd.to_datetime(hist.index)
+        if getattr(idx, 'tz', None) is not None:
+            idx = idx.tz_localize(None)
+        volume.index = idx.normalize()
+        volume = volume[volume > 0].groupby(level=0).last()
+        volume.name = symbol
+        return volume
+    except Exception:
+        LOGGER.warning('Failed to download volume history for %s.', symbol, exc_info=True)
+        return pd.Series(dtype=float, name=symbol)
+
+
+def has_period_volume_coverage(series, start_date, end_date):
+    """Check that a volume series has enough observations across the requested periods."""
+    if not isinstance(series.index, pd.DatetimeIndex) or series.empty:
+        return False
+    start = pd.Timestamp(start_date).normalize()
+    end = pd.Timestamp(end_date).normalize()
+    observed_dates = series.dropna().index
+    if observed_dates.min() > start + pd.Timedelta(days=7) or observed_dates.max() < end - pd.Timedelta(days=5):
+        return False
+    periods = [(start, min(end, SPLIT_DATE - pd.Timedelta(days=1))), (max(start, SPLIT_DATE), min(end, YEAR_2026_START - pd.Timedelta(days=1))), (max(start, YEAR_2026_START), end)]
+    checked_period = False
+    for period_start, period_end in periods:
+        if period_start > period_end:
+            continue
+        checked_period = True
+        period_series = series.loc[period_start:period_end].dropna()
+        if len(period_series) < MIN_VOLUME_OBSERVATIONS or period_series.index.min() > period_start + pd.Timedelta(days=7) or period_series.index.max() < period_end - pd.Timedelta(days=5):
+            return False
+    return checked_period
+
+
+def trailing_volume_percentile(volume):
+    """Compare each volume observation with its trailing year of activity."""
+    observed_volume = volume.dropna()
+    # I use a trailing window so a date's percentile is not affected by later trading activity.
+    percentiles = observed_volume.rolling(VOLUME_PERCENTILE_WINDOW, min_periods=MIN_VOLUME_OBSERVATIONS).apply(lambda window: window.rank(pct=True).iloc[-1] * 100)
+    return percentiles.reindex(volume.index)
+
+
+def write_volume_cache(raw_volumes, sources):
+    """Save the downloaded volume data and its source information to the local cache."""
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    temporary_paths = []
+    try:
+        with tempfile.NamedTemporaryFile(mode='w', encoding='utf-8', dir=DATA_DIR, delete=False) as csv_file:
+            temporary_paths.append(csv_file.name)
+            raw_volumes.rename_axis('Date').to_csv(csv_file)
+        with tempfile.NamedTemporaryFile(mode='w', encoding='utf-8', dir=DATA_DIR, delete=False) as source_file:
+            temporary_paths.append(source_file.name)
+            json.dump(sources, source_file, indent=2)
+        os.replace(temporary_paths[0], VOLUME_CACHE_CSV)
+        os.replace(temporary_paths[1], VOLUME_CACHE_SOURCES)
+    except OSError:
+        LOGGER.exception('Could not write the trading-volume cache.')
+        for temporary_path in temporary_paths:
+            if os.path.exists(temporary_path):
+                os.unlink(temporary_path)
+        raise
+
+
+def load_volume_data(start_date, end_date):
+    """Load volume history, reusing the local cache when it has enough coverage."""
+    requested_start = pd.Timestamp(start_date).normalize()
+    requested_end = pd.Timestamp(end_date).normalize()
+    download_start = requested_start - pd.Timedelta(days=370)
+    cached_volumes = pd.DataFrame()
+    cached_sources = {}
+    if VOLUME_CACHE_CSV.exists():
+        cached_volumes = pd.read_csv(VOLUME_CACHE_CSV, index_col='Date', parse_dates=True)
+        cached_volumes.index = pd.to_datetime(cached_volumes.index).normalize()
+        cached_volumes = cached_volumes.apply(pd.to_numeric, errors='coerce')
+        if VOLUME_CACHE_SOURCES.exists():
+            with VOLUME_CACHE_SOURCES.open(encoding='utf-8') as source_file:
+                cached_sources = json.load(source_file)
+    # I keep the raw volumes in a cache so the panel does not need to download them on every rerun.
+    raw_volumes = cached_volumes.copy()
+    source_by_asset = dict(cached_sources)
+    cache_changed = False
+    # Prefer futures volume, then fall back to the related ETF if coverage is poor.
+    for asset, candidates in VOLUME_SYMBOLS.items():
+        cached_series = cached_volumes.get(asset, pd.Series(dtype=float))
+        cached_source = cached_sources.get(asset, 'Unavailable')
+        if cached_source != 'Unavailable' and has_period_volume_coverage(cached_series, requested_start, requested_end):
+            continue
+        chosen = pd.Series(dtype=float)
+        chosen_source = 'Unavailable'
+        for symbol, label in candidates:
+            candidate = download_one_volume_series(symbol, str(download_start.date()), str(requested_end.date()))
+            if has_period_volume_coverage(candidate, requested_start, requested_end):
+                chosen = candidate
+                chosen_source = label
+                break
+        if source_by_asset.get(asset) != chosen_source:
+            cache_changed = True
+        source_by_asset[asset] = chosen_source
+        if not chosen.empty:
+            cache_changed = True
+            if asset not in raw_volumes:
+                raw_volumes[asset] = np.nan
+            raw_volumes = raw_volumes.reindex(raw_volumes.index.union(chosen.index))
+            raw_volumes.loc[chosen.index, asset] = chosen
+    if not raw_volumes.empty:
+        raw_volumes = raw_volumes.sort_index()
+        if cache_changed:
+            write_volume_cache(raw_volumes, source_by_asset)
+        percentiles = raw_volumes.apply(trailing_volume_percentile)
+        return (percentiles.loc[requested_start:requested_end], source_by_asset)
+    return (pd.DataFrame(), source_by_asset)
+
+
+def clean_series(series):
+    """Convert a series to numeric values and remove missing or infinite observations."""
+    return pd.to_numeric(series, errors='coerce').replace([np.inf, -np.inf], np.nan).dropna()
+
+
+def period_slice(data, period):
+    """Return the observations that fall within the selected analysis period."""
+    if period == '2015–2024':
+        return data.loc[data.index < SPLIT_DATE]
+    if period == '2025':
+        return data.loc[(data.index >= SPLIT_DATE) & (data.index < YEAR_2026_START)]
+    if period == '2026 YTD':
+        return data.loc[data.index >= YEAR_2026_START]
+    if period == 'Since 2025':
+        return data.loc[data.index >= SPLIT_DATE]
+    return data.iloc[0:0]
