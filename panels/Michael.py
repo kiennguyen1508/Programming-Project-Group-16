@@ -2,7 +2,7 @@
 Panel 4 — Distribution & Risk (Michael)
 
 Main visual: interactive three-dimensional joint probability-density surface.
-X = daily return (%)
+X = daily log return (%)
 Y = trading-volume percentile (0–100, calculated within each asset)
 Z = joint probability density of return and trading activity.
 
@@ -16,6 +16,9 @@ statistics, tail tests, historical VaR breaches and rolling volatility.
 """
 
 import json
+import logging
+import os
+import tempfile
 
 import numpy as np
 import pandas as pd
@@ -32,9 +35,13 @@ try:
 except ImportError:
     yf = None
 
+LOGGER = logging.getLogger(__name__)
 SPLIT_DATE = pd.Timestamp("2025-01-01")
 YEAR_2026_START = pd.Timestamp("2026-01-01")
 TRADING_DAYS = 252
+VOLUME_PERCENTILE_WINDOW = 252
+MIN_VOLUME_OBSERVATIONS = 60
+MIN_RELIABLE_SAMPLE = 250
 
 ASSET_ORDER = ["Gold", "Silver", "Copper", "Oil", "S&P 500"]
 ASSET_COLOURS = {
@@ -45,12 +52,6 @@ ASSET_COLOURS = {
     "S&P 500": "#9C8CFF",
 }
 PERIODS = ["2015–2024", "2025", "2026 YTD", "Since 2025"]
-PERIOD_COLOURS = {
-    "2015–2024": "#718096",
-    "2025": "#E0A82E",
-    "2026 YTD": "#42A5F5",
-    "Since 2025": "#A78BFA",
-}
 # Primary Yahoo symbols are the same market series used by the group where possible.
 # ETF alternatives are explicitly labelled proxies for trading activity only.
 VOLUME_SYMBOLS = {
@@ -60,25 +61,31 @@ VOLUME_SYMBOLS = {
     "Oil": [("BZ=F", "Brent futures volume"), ("USO", "USO ETF volume proxy")],
     "S&P 500": [("SPY", "SPY ETF volume proxy")],
 }
-VOLUME_CACHE_CSV = DATA_DIR / "volume_percentiles.csv"
-VOLUME_CACHE_SOURCES = DATA_DIR / "volume_percentiles_sources.json"
+VOLUME_CACHE_CSV = DATA_DIR / "volume_history.csv"
+VOLUME_CACHE_SOURCES = DATA_DIR / "volume_history_sources.json"
 
 METHOD_NOTES = """
 **Joint probability-density surface.** The surface is a two-dimensional
-Gaussian kernel density estimate (KDE) of daily returns and trading activity.
-X represents daily log returns in percent; Y represents each asset's
-trading-volume percentile over its available history; Z represents estimated
-joint probability density. Higher-density regions indicate return and activity
-combinations that are more concentrated in the observed sample. This is a
-descriptive joint distribution, not a forecast or evidence of causation.
+Gaussian kernel density estimate (KDE) of daily log returns and trading
+activity. X represents daily log returns in percent; Y represents each asset's
+volume percentile within the trailing 252-observation window ending on that
+date (using available history at the start of the sample); Z represents
+estimated joint probability density. Reflected KDE samples
+reduce boundary bias at percentiles 0 and 100. Higher-density regions indicate
+return and activity combinations that are more concentrated in the observed
+sample. This is a descriptive joint distribution, not a forecast or evidence
+of causation.
 
 **Volume treatment.** Futures volume is used where Yahoo Finance provides
 enough observations. Otherwise the panel uses a named ETF proxy (GLD, SLV,
 CPER, USO or SPY). Volume is converted to a percentile within each instrument
 so that 90 means unusually high activity for that instrument, not the same
-number of contracts or shares. ETF proxy volume is a measure of related-market
-activity; it is not the exact volume of the futures or index series whose
-returns are plotted.
+number of contracts or shares. Percentiles use only the current and preceding
+251 available observations, avoiding look-ahead from later volume data. The
+initial percentiles use a shorter window until sufficient history is available.
+ETF proxy volume is a measure of related-market activity; it is not the exact
+volume of the futures or index series whose returns are plotted. Continuous
+futures contracts can show volume disruptions around contract rolls.
 
 **Risk.** Annualised volatility = daily standard deviation × √252. 95% VaR is
 the fifth-percentile loss threshold; Expected Shortfall is the average loss
@@ -87,11 +94,23 @@ excess kurtosis measures tail heaviness. Maximum drawdown is calculated from
 the cumulative wealth path reconstructed from log returns.
 
 **Tests.** KS compares the pre-2025 and post-2024 return distributions;
-Levene compares their variances. Standard p-values assume independent
-observations, while financial returns can exhibit volatility clustering.
-Interpret p-values alongside sample sizes, effect sizes and visual evidence.
+Levene compares their variances. P-values are Holm-adjusted across the selected
+assets. Standard p-values assume independent observations, while financial
+returns can exhibit volatility clustering. The VaR backtest reports Kupiec
+coverage and Christoffersen independence tests; these also rely on simplifying
+distributional assumptions. Interpret all tests alongside sample sizes, effect
+sizes and visual evidence.
 
-**Limitations.** 2026 is a partial year. Different markets have different
+**Activity comparison.** Mean absolute daily log returns are compared between
+low- and high-volume terciles in 2015–2024 and since 2025. The change in the
+high-minus-low gap for Gold is also compared with the average change for the
+available peer assets. This is a descriptive difference-in-differences summary,
+not a causal estimate.
+
+**Limitations.** Rows with fewer than 250 observations are flagged; tail
+statistics are less stable for these samples. The activity comparison uses
+empirical volume terciles and does not establish causality. 2026 is a partial
+year. Different markets have different
 trading hours and holidays. Futures can be affected by contract rolls. KDE
 shape depends on bandwidth and sample size. S&P 500 index returns exclude
 dividends. These historical patterns do not predict future returns.
@@ -114,17 +133,19 @@ def load_shared_data():
         if "Copper" in macro_changes.columns:
             returns = returns.join(macro_changes["Copper"].rename("Copper"), how="left")
         elif "Copper" in macro.columns:
-            returns = returns.join(macro["Copper"].pct_change().rename("Copper"), how="left")
+            copper = pd.to_numeric(macro["Copper"], errors="coerce")
+            log_returns = np.log(copper.where(copper > 0)).diff()
+            returns = returns.join(log_returns.rename("Copper"), how="left")
 
     returns = returns.apply(pd.to_numeric, errors="coerce")
     returns = returns.replace([np.inf, -np.inf], np.nan)
     return returns
 
 
-@st.cache_data(ttl=86400, show_spinner=False, max_entries=500)
 def download_one_volume_series(symbol, start_date, end_date):
-    """Download daily volume from Yahoo Finance; return an empty series on failure."""
+    """Download daily volume from Yahoo Finance."""
     if yf is None:
+        LOGGER.warning("Cannot download %s volume: yfinance is not installed.", symbol)
         return pd.Series(dtype=float, name=symbol)
     try:
         hist = yf.Ticker(symbol).history(
@@ -141,78 +162,138 @@ def download_one_volume_series(symbol, start_date, end_date):
         volume.name = symbol
         return volume
     except Exception:
+        LOGGER.warning("Failed to download volume history for %s.", symbol, exc_info=True)
         return pd.Series(dtype=float, name=symbol)
 
 
-@st.cache_data(ttl=86400, show_spinner=False, max_entries=20)
+def has_period_volume_coverage(series, start_date, end_date):
+    """Require usable volume observations in each analysis period in range."""
+    if not isinstance(series.index, pd.DatetimeIndex) or series.empty:
+        return False
+    start = pd.Timestamp(start_date).normalize()
+    end = pd.Timestamp(end_date).normalize()
+    observed_dates = series.dropna().index
+    if (
+        observed_dates.min() > start + pd.Timedelta(days=7)
+        or observed_dates.max() < end - pd.Timedelta(days=5)
+    ):
+        return False
+    periods = [
+        (start, min(end, SPLIT_DATE - pd.Timedelta(days=1))),
+        (max(start, SPLIT_DATE), min(end, YEAR_2026_START - pd.Timedelta(days=1))),
+        (max(start, YEAR_2026_START), end),
+    ]
+    checked_period = False
+    for period_start, period_end in periods:
+        if period_start > period_end:
+            continue
+        checked_period = True
+        period_series = series.loc[period_start:period_end].dropna()
+        if (
+            len(period_series) < MIN_VOLUME_OBSERVATIONS
+            or period_series.index.min() > period_start + pd.Timedelta(days=7)
+            or period_series.index.max() < period_end - pd.Timedelta(days=5)
+        ):
+            return False
+    return checked_period
+
+
+def trailing_volume_percentile(volume):
+    """Rank each day's volume within the trailing 252-observation window."""
+    observed_volume = volume.dropna()
+    percentiles = observed_volume.rolling(
+        VOLUME_PERCENTILE_WINDOW,
+        min_periods=MIN_VOLUME_OBSERVATIONS,
+    ).apply(lambda window: window.rank(pct=True).iloc[-1] * 100)
+    return percentiles.reindex(volume.index)
+
+
+def write_volume_cache(raw_volumes, sources):
+    """Atomically replace raw-volume and source cache files."""
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    temporary_paths = []
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w", encoding="utf-8", dir=DATA_DIR, delete=False
+        ) as csv_file:
+            temporary_paths.append(csv_file.name)
+            raw_volumes.rename_axis("Date").to_csv(csv_file)
+        with tempfile.NamedTemporaryFile(
+            mode="w", encoding="utf-8", dir=DATA_DIR, delete=False
+        ) as source_file:
+            temporary_paths.append(source_file.name)
+            json.dump(sources, source_file, indent=2)
+        os.replace(temporary_paths[0], VOLUME_CACHE_CSV)
+        os.replace(temporary_paths[1], VOLUME_CACHE_SOURCES)
+    except OSError:
+        LOGGER.exception("Could not write the trading-volume cache.")
+        for temporary_path in temporary_paths:
+            if os.path.exists(temporary_path):
+                os.unlink(temporary_path)
+        raise
+
+
 def load_volume_data(start_date, end_date):
-    """Load cached volume percentiles or download and persist them when needed."""
-    cached_volumes = None
+    """Load raw volumes, retry incomplete sources, and compute trailing ranks."""
+    requested_start = pd.Timestamp(start_date).normalize()
+    requested_end = pd.Timestamp(end_date).normalize()
+    download_start = requested_start - pd.Timedelta(days=370)
+
+    cached_volumes = pd.DataFrame()
     cached_sources = {}
     if VOLUME_CACHE_CSV.exists():
         cached_volumes = pd.read_csv(
             VOLUME_CACHE_CSV, index_col="Date", parse_dates=True
         )
         cached_volumes.index = pd.to_datetime(cached_volumes.index).normalize()
+        cached_volumes = cached_volumes.apply(pd.to_numeric, errors="coerce")
         if VOLUME_CACHE_SOURCES.exists():
             with VOLUME_CACHE_SOURCES.open(encoding="utf-8") as source_file:
                 cached_sources = json.load(source_file)
 
-        requested_start = pd.Timestamp(start_date).normalize()
-        requested_end = pd.Timestamp(end_date).normalize()
-        if (
-            not cached_volumes.empty
-            and cached_volumes.index.min()
-            <= requested_start + pd.Timedelta(days=7)
-            and cached_volumes.index.max() >= requested_end - pd.Timedelta(days=5)
-        ):
-            return (
-                cached_volumes.loc[requested_start:requested_end],
-                cached_sources,
-            )
-
-    series_by_asset = {}
-    source_by_asset = {}
+    raw_volumes = cached_volumes.copy()
+    source_by_asset = dict(cached_sources)
+    cache_changed = False
     for asset, candidates in VOLUME_SYMBOLS.items():
+        cached_series = cached_volumes.get(asset, pd.Series(dtype=float))
+        cached_source = cached_sources.get(asset, "Unavailable")
+        if (
+            cached_source != "Unavailable"
+            and has_period_volume_coverage(
+                cached_series, requested_start, requested_end
+            )
+        ):
+            continue
+
         chosen = pd.Series(dtype=float)
         chosen_source = "Unavailable"
         for symbol, label in candidates:
-            candidate = download_one_volume_series(symbol, start_date, end_date)
-            if len(candidate) >= 60:
-                # Futures data can be sparse on Yahoo; require a reasonable coverage.
+            candidate = download_one_volume_series(
+                symbol, str(download_start.date()), str(requested_end.date())
+            )
+            if has_period_volume_coverage(candidate, requested_start, requested_end):
                 chosen = candidate
                 chosen_source = label
-                if symbol.endswith("=F") and candidate.notna().sum() >= 250:
-                    break
-                if symbol in ("SPY", "GLD", "SLV", "CPER", "USO"):
-                    break
-        if not chosen.empty:
-            # Rank against the full downloaded history, not separately by year.
-            percentile = chosen.rank(pct=True) * 100
-            percentile.name = asset
-            series_by_asset[asset] = percentile
-        source_by_asset[asset] = chosen_source
-    if series_by_asset:
-        volumes = pd.DataFrame(series_by_asset)
-        if cached_volumes is not None:
-            volumes = volumes.combine_first(cached_volumes)
-            source_by_asset = {
-                **cached_sources,
-                **{
-                    asset: source
-                    for asset, source in source_by_asset.items()
-                    if source != "Unavailable"
-                },
-            }
+                break
 
-        DATA_DIR.mkdir(parents=True, exist_ok=True)
-        volumes.index.name = "Date"
-        volumes.to_csv(VOLUME_CACHE_CSV)
-        with VOLUME_CACHE_SOURCES.open("w", encoding="utf-8") as source_file:
-            json.dump(source_by_asset, source_file, indent=2)
-        return volumes, source_by_asset
-    if cached_volumes is not None:
-        return cached_volumes, cached_sources
+        if source_by_asset.get(asset) != chosen_source:
+            cache_changed = True
+        source_by_asset[asset] = chosen_source
+        if not chosen.empty:
+            cache_changed = True
+            if asset not in raw_volumes:
+                raw_volumes[asset] = np.nan
+            raw_volumes = raw_volumes.reindex(
+                raw_volumes.index.union(chosen.index)
+            )
+            raw_volumes.loc[chosen.index, asset] = chosen
+
+    if not raw_volumes.empty:
+        raw_volumes = raw_volumes.sort_index()
+        if cache_changed:
+            write_volume_cache(raw_volumes, source_by_asset)
+        percentiles = raw_volumes.apply(trailing_volume_percentile)
+        return percentiles.loc[requested_start:requested_end], source_by_asset
     return pd.DataFrame(), source_by_asset
 
 
@@ -259,7 +340,7 @@ def make_joint_distribution_3d(returns, volumes, distribution_specs, bandwidth=1
             pairs.append((asset, period, data))
 
     if not pairs:
-        return None, (
+        return None, None, (
             "Not enough aligned daily-return and trading-volume observations. "
             "Try another asset or a longer period."
         )
@@ -286,28 +367,31 @@ def make_joint_distribution_3d(returns, volumes, distribution_specs, bandwidth=1
     )
 
     surfaces_added = 0
+    density_surfaces = []
     for col, (asset, period, data) in enumerate(pairs, start=1):
         observations = data[["return", "volume_percentile"]].to_numpy(dtype=float)
         observations[:, 0] *= 100
 
-        # Deterministic cap keeps the interactive surface responsive.
-        if len(observations) > 6000:
-            rng = np.random.default_rng(17)
-            observations = observations[
-                rng.choice(len(observations), 6000, replace=False)
-            ]
-
         try:
+            reflected_observations = np.concatenate(
+                [
+                    observations,
+                    observations * np.array([1.0, -1.0]),
+                    observations * np.array([1.0, -1.0])
+                    + np.array([0.0, 200.0]),
+                ]
+            )
             kde = gaussian_kde(
-                observations.T,
+                reflected_observations.T,
                 bw_method=lambda fitted: fitted.scotts_factor() * bandwidth,
             )
             positions = np.vstack([xx.ravel(), yy.ravel()])
-            zz = kde(positions).reshape(xx.shape)
+            zz = kde(positions).reshape(xx.shape) * 3
         except (np.linalg.LinAlgError, ValueError):
             continue
 
         surfaces_added += 1
+        density_surfaces.append((asset, period, zz))
         label = f"{asset} · {period}"
         fig.add_trace(
             go.Surface(
@@ -334,7 +418,7 @@ def make_joint_distribution_3d(returns, volumes, distribution_specs, bandwidth=1
                 ),
                 hovertemplate=(
                     f"<b>{label}</b><br>"
-                    "Daily return: %{x:.2f}%<br>"
+                    "Daily log return: %{x:.2f}%<br>"
                     "Trading-volume percentile: %{y:.0f}<br>"
                     "Joint probability density: %{z:.5f}<extra></extra>"
                 ),
@@ -344,8 +428,11 @@ def make_joint_distribution_3d(returns, volumes, distribution_specs, bandwidth=1
         )
 
     if surfaces_added == 0:
-        return None, "The joint distributions could not be estimated from the available observations."
+        return None, None, (
+            "The joint distributions could not be estimated from the available observations."
+        )
 
+    density_max = max(float(np.nanmax(density)) for _, _, density in density_surfaces)
     fig.update_layout(
         title=dict(
             text="Joint probability distribution: daily returns × trading activity",
@@ -358,7 +445,7 @@ def make_joint_distribution_3d(returns, volumes, distribution_specs, bandwidth=1
     )
     fig.update_scenes(
         xaxis=dict(
-            title="Daily price change / return (%)",
+            title="Daily log return (%)",
             range=[x_lo - x_pad, x_hi + x_pad],
             gridcolor="rgba(150,160,180,0.22)",
             zeroline=True,
@@ -370,7 +457,7 @@ def make_joint_distribution_3d(returns, volumes, distribution_specs, bandwidth=1
         ),
         zaxis=dict(
             title="Probability density",
-            rangemode="tozero",
+            range=[0, density_max * 1.05],
             gridcolor="rgba(150,160,180,0.22)",
         ),
         aspectmode="manual",
@@ -378,7 +465,48 @@ def make_joint_distribution_3d(returns, volumes, distribution_specs, bandwidth=1
         camera=dict(eye=dict(x=1.55, y=1.65, z=1.0)),
         bgcolor="rgba(0,0,0,0)",
     )
-    return fig, None
+
+    contour_fig = make_subplots(
+        rows=1,
+        cols=len(density_surfaces),
+        subplot_titles=[
+            f"{asset} · {period}" for asset, period, _ in density_surfaces
+        ],
+        horizontal_spacing=0.08,
+    )
+    for col, (asset, period, density) in enumerate(density_surfaces, start=1):
+        contour_fig.add_trace(
+            go.Contour(
+                x=x_grid,
+                y=y_grid,
+                z=density,
+                name=f"{asset} · {period}",
+                colorscale="Turbo",
+                zmin=0,
+                zmax=density_max,
+                ncontours=20,
+                showscale=col == 1,
+                colorbar=dict(title="Density"),
+                hovertemplate=(
+                    f"<b>{asset} · {period}</b><br>"
+                    "Daily log return: %{x:.2f}%<br>"
+                    "Volume percentile: %{y:.0f}<br>"
+                    "Joint density: %{z:.5f}<extra></extra>"
+                ),
+            ),
+            row=1,
+            col=col,
+        )
+    contour_fig.update_layout(
+        title="Joint density contours (shared color scale)",
+        height=440,
+        margin=dict(l=20, r=20, t=80, b=20),
+        paper_bgcolor="rgba(0,0,0,0)",
+        font=dict(color="#DCE2EC"),
+    )
+    contour_fig.update_xaxes(title_text="Daily return (%)")
+    contour_fig.update_yaxes(title_text="Volume percentile", range=[0, 100])
+    return fig, contour_fig, None
 
 
 def max_drawdown_from_log_returns(log_returns):
@@ -418,8 +546,85 @@ def risk_table(returns, assets, periods):
             if asset in subset:
                 result = risk_statistics(subset[asset])
                 if result:
-                    rows.append({"Asset": asset, "Period": period, **result})
+                    rows.append(
+                        {
+                            "Asset": asset,
+                            "Period": period,
+                            **result,
+                            "Sample note": (
+                                "Limited sample"
+                                if result["Observations"] < MIN_RELIABLE_SAMPLE
+                                else ""
+                            ),
+                        }
+                    )
     return pd.DataFrame(rows)
+
+
+def activity_relationship_table(returns, volumes, assets):
+    """Compare absolute returns in low- and high-volume terciles by period."""
+    rows = []
+    for asset in assets:
+        if asset not in returns or asset not in volumes:
+            continue
+
+        row = {"Asset": asset}
+        period_gaps = {}
+        for period, suffix in (("2015–2024", "2015–2024"), ("Since 2025", "Since 2025")):
+            aligned = pd.concat(
+                [
+                    period_slice(returns[[asset]], period)[asset].rename("return"),
+                    period_slice(volumes[[asset]], period)[asset].rename("volume"),
+                ],
+                axis=1,
+            ).dropna()
+            if aligned.empty or aligned["volume"].nunique() < 3:
+                continue
+
+            low_cut, high_cut = aligned["volume"].quantile([1 / 3, 2 / 3])
+            if low_cut >= high_cut:
+                continue
+            low_returns = aligned.loc[
+                aligned["volume"] <= low_cut, "return"
+            ].abs()
+            high_returns = aligned.loc[
+                aligned["volume"] >= high_cut, "return"
+            ].abs()
+            if len(low_returns) < 30 or len(high_returns) < 30:
+                continue
+
+            low_mean = low_returns.mean() * 100
+            high_mean = high_returns.mean() * 100
+            gap = high_mean - low_mean
+            row[f"{suffix} low-volume |return| (%)"] = low_mean
+            row[f"{suffix} high-volume |return| (%)"] = high_mean
+            row[f"{suffix} high-low gap (pp)"] = gap
+            row[f"{suffix} low/high observations"] = (
+                f"{len(low_returns)}/{len(high_returns)}"
+            )
+            period_gaps[suffix] = gap
+
+        if "2015–2024" in period_gaps and "Since 2025" in period_gaps:
+            row["Change in gap (pp)"] = (
+                period_gaps["Since 2025"] - period_gaps["2015–2024"]
+            )
+        if len(row) > 1:
+            rows.append(row)
+
+    table = pd.DataFrame(rows)
+    if "Change in gap (pp)" in table and "Gold" in table["Asset"].values:
+        peer_changes = table.loc[
+            table["Asset"] != "Gold", "Change in gap (pp)"
+        ].dropna()
+        gold_change = table.loc[
+            table["Asset"] == "Gold", "Change in gap (pp)"
+        ].iloc[0]
+        if not peer_changes.empty and pd.notna(gold_change):
+            table["Gold minus peer-average change (pp)"] = np.nan
+            table.loc[
+                table["Asset"] == "Gold", "Gold minus peer-average change (pp)"
+            ] = gold_change - peer_changes.mean()
+    return table
 
 
 def make_rolling_volatility(returns, assets, window=30):
@@ -462,6 +667,18 @@ def make_rolling_volatility(returns, assets, window=30):
     return fig
 
 
+def holm_adjust(p_values):
+    """Apply Holm's family-wise error correction to a sequence of p-values."""
+    p_values = np.asarray(p_values, dtype=float)
+    order = np.argsort(p_values)
+    adjusted_sorted = np.maximum.accumulate(
+        (len(p_values) - np.arange(len(p_values))) * p_values[order]
+    )
+    adjusted = np.empty_like(adjusted_sorted)
+    adjusted[order] = np.minimum(adjusted_sorted, 1.0)
+    return adjusted
+
+
 def tests_table(returns, assets):
     """Compare pre-2025 and post-2024 distributions for each selected asset."""
     before = period_slice(returns, "2015–2024")
@@ -479,11 +696,76 @@ def tests_table(returns, assets):
                     "KS p-value": ks.pvalue,
                     "Levene statistic": lev.statistic,
                     "Levene p-value": lev.pvalue,
+                    "Post/pre volatility ratio": (
+                        y.std(ddof=1) / x.std(ddof=1)
+                    ),
                     "Pre-2025 n": len(x),
                     "Post-2024 n": len(y),
                 }
             )
-    return pd.DataFrame(rows)
+    table = pd.DataFrame(rows)
+    if not table.empty:
+        table["KS p-value (Holm)"] = holm_adjust(table["KS p-value"])
+        table["Levene p-value (Holm)"] = holm_adjust(
+            table["Levene p-value"]
+        )
+    return table
+
+
+def bernoulli_log_likelihood(successes, total, probability):
+    """Return a Bernoulli log likelihood without undefined zero-count terms."""
+    failures = total - successes
+    if (successes and probability <= 0) or (failures and probability >= 1):
+        return -np.inf
+    likelihood = 0.0
+    if successes:
+        likelihood += successes * np.log(probability)
+    if failures:
+        likelihood += failures * np.log1p(-probability)
+    return float(likelihood)
+
+
+def var_backtest_tests(breaches, expected_rate=0.05):
+    """Return Kupiec coverage and Christoffersen independence test results."""
+    breach_values = np.asarray(breaches, dtype=bool)
+    count = int(breach_values.sum())
+    total = len(breach_values)
+    observed_rate = count / total
+
+    null_likelihood = bernoulli_log_likelihood(
+        count, total, expected_rate
+    )
+    observed_likelihood = bernoulli_log_likelihood(
+        count, total, observed_rate
+    )
+    kupiec_lr = max(0.0, 2 * (observed_likelihood - null_likelihood))
+
+    previous = breach_values[:-1]
+    current = breach_values[1:]
+    n00 = int(((previous == 0) & (current == 0)).sum())
+    n01 = int(((previous == 0) & (current == 1)).sum())
+    n10 = int(((previous == 1) & (current == 0)).sum())
+    n11 = int(((previous == 1) & (current == 1)).sum())
+    transitions = n00 + n01 + n10 + n11
+    overall_probability = (n01 + n11) / transitions
+    probability_after_nonbreach = n01 / (n00 + n01) if n00 + n01 else 0.0
+    probability_after_breach = n11 / (n10 + n11) if n10 + n11 else 0.0
+    independence_null = bernoulli_log_likelihood(
+        n01 + n11, transitions, overall_probability
+    )
+    independence_alternative = (
+        bernoulli_log_likelihood(n01, n00 + n01, probability_after_nonbreach)
+        + bernoulli_log_likelihood(n11, n10 + n11, probability_after_breach)
+    )
+    christoffersen_lr = max(
+        0.0, 2 * (independence_alternative - independence_null)
+    )
+    return {
+        "Kupiec LR": kupiec_lr,
+        "Kupiec p-value": stats.chi2.sf(kupiec_lr, df=1),
+        "Christoffersen LR": christoffersen_lr,
+        "Christoffersen p-value": stats.chi2.sf(christoffersen_lr, df=1),
+    }
 
 
 def var_breach_table(returns, assets):
@@ -495,7 +777,7 @@ def var_breach_table(returns, assets):
         base, later = clean_series(before[asset]), clean_series(after[asset])
         if len(base) >= 100 and len(later) >= 20:
             threshold = base.quantile(0.05)
-            breach = later < threshold
+            breach = later <= threshold
             rows.append(
                 {
                     "Asset": asset,
@@ -504,6 +786,7 @@ def var_breach_table(returns, assets):
                     "Expected breach rate (%)": 5.0,
                     "Breach days": int(breach.sum()),
                     "Post-2024 observations": len(later),
+                    **var_backtest_tests(breach),
                 }
             )
     return pd.DataFrame(rows)
@@ -554,7 +837,7 @@ def render():
             PERIODS[:3],
             default=PERIODS[0],
             key="p4_primary_period",
-        )
+        ) or PERIODS[0]
     with c3:
         bandwidth = st.select_slider(
             "KDE bandwidth",
@@ -586,7 +869,7 @@ def render():
                 PERIODS[:3],
                 default=PERIODS[1],
                 key="p4_compare_period",
-            )
+            ) or PERIODS[1]
         distribution_specs.append((compare_asset, compare_period))
 
     chosen_assets = list(dict.fromkeys(asset for asset, _ in distribution_specs))
@@ -599,33 +882,45 @@ def render():
         ]
         st.caption("Volume sources — " + " | ".join(source_lines))
 
-    missing_volume = [a for a in chosen_assets if a not in volumes.columns]
+    missing_volume = [
+        asset
+        for asset in chosen_assets
+        if asset not in volumes.columns
+        or volume_sources.get(asset, "Unavailable") == "Unavailable"
+    ]
     if missing_volume:
         st.warning(
             "Volume unavailable for: " + ", ".join(missing_volume)
             + ". Check the Yahoo Finance symbols or remove the unavailable asset."
         )
     elif chosen_assets:
-        fig, error = make_joint_distribution_3d(
+        fig, contour_fig, error = make_joint_distribution_3d(
             returns, volumes, distribution_specs, bandwidth
         )
         if error:
             st.warning(error)
         else:
-            st.plotly_chart(
-                fig,
-                width="stretch",
-                key="p4_joint_distribution_3d",
-                config={"scrollZoom": True, "displaylogo": False},
-            )
+            chart_column, contour_column = st.columns([1.25, 1], gap="medium")
+            with chart_column:
+                st.plotly_chart(
+                    fig,
+                    width="stretch",
+                    key="p4_joint_distribution_3d",
+                    config={"scrollZoom": True, "displaylogo": False},
+                )
+            with contour_column:
+                st.plotly_chart(
+                    contour_fig,
+                    width="stretch",
+                    key="p4_joint_distribution_contours",
+                )
 
     st.caption(
-        "X = daily percentage return; Y = trading-volume percentile within that "
-        "instrument (0–100); Z = estimated joint probability density. The "
-        "percentile normalises activity within each market, so it compares "
-        "unusually quiet versus unusually busy days rather than raw contract "
-        "or share counts. When comparison is enabled, the distributions are "
-        "shown side-by-side rather than obscuring one another."
+        "X = daily log return (%); Y = trailing 252-observation volume "
+        "percentile (0–100); Z = estimated joint probability density. The "
+        "percentile compares relative activity within each instrument, not "
+        "raw contract or share counts. Contour plots use a shared density "
+        "scale to support direct comparison."
     )
 
     with st.expander("Interpreting the joint distribution", expanded=True):
@@ -643,14 +938,20 @@ def render():
     periods_for_risk = chosen_periods or ["2015–2024", "2025", "2026 YTD"]
     table = risk_table(returns, selected_for_risk, periods_for_risk)
     if not table.empty:
-        numeric = [c for c in table.columns if c not in ["Asset", "Period", "Observations"]]
+        numeric = [
+            c
+            for c in table.columns
+            if c not in ["Asset", "Period", "Observations", "Sample note"]
+        ]
         table[numeric] = table[numeric].round(3)
         st.dataframe(table, hide_index=True, width="stretch")
     else:
         st.info("Not enough observations for the selected risk statistics.")
     st.caption(
         "VaR and Expected Shortfall are daily losses; larger values mean greater "
-        "downside risk. Volatility is annualised. Kurtosis is excess kurtosis."
+        "downside risk. Volatility is annualised. Kurtosis is excess kurtosis. "
+        "Rows with fewer than 250 observations are flagged; tail estimates from "
+        "small samples are less stable."
     )
 
     st.markdown("### 3. Historical 95% VaR backtest")
@@ -662,7 +963,8 @@ def render():
     st.caption(
         "Each asset's 2015–2024 5th-percentile loss threshold is held fixed and "
         "tested against 2025 onwards. A breach rate above 5% means the historical "
-        "95% VaR threshold was exceeded more often than its nominal rate."
+        "95% VaR threshold was exceeded more often than its nominal rate. Kupiec "
+        "tests unconditional coverage; Christoffersen tests breach independence."
     )
 
     st.markdown("### 4. Rolling volatility")
@@ -676,7 +978,28 @@ def render():
         width="stretch", key="p4_distribution_rolling"
     )
 
-    st.markdown("### 5. Statistical tests for distribution changes")
+    st.markdown("### 5. Relationship between trading activity and returns")
+    activity = activity_relationship_table(
+        returns, volumes, assets
+    )
+    if not activity.empty:
+        numeric = [
+            column
+            for column in activity.columns
+            if "observations" not in column.lower() and column != "Asset"
+        ]
+        activity[numeric] = activity[numeric].round(3)
+        st.dataframe(activity, hide_index=True, width="stretch")
+    else:
+        st.info("Insufficient aligned return and volume data for the comparison.")
+    st.caption(
+        "Mean absolute daily log returns are compared across each period's low- "
+        "and high-volume terciles. The high-minus-low gap is descriptive. The "
+        "Gold-versus-peer change is the change in Gold's gap minus the average "
+        "change among available peer assets; it is not a causal estimate."
+    )
+
+    st.markdown("### 6. Statistical tests for distribution changes")
     tests = tests_table(returns, selected_for_risk)
     if not tests.empty:
         st.dataframe(tests.round(4), hide_index=True, width="stretch")
@@ -684,17 +1007,26 @@ def render():
         st.info("Insufficient observations for the pre-2025 versus post-2024 tests.")
     st.caption(
         "KS tests compare full return distributions; Levene tests compare "
-        "variances. Standard p-values assume independent observations. Daily "
-        "financial returns can exhibit volatility clustering. Interpret the "
-        "results as indicative and consider them alongside the visualizations "
-        "and effect sizes."
+        "variances. Holm-adjusted p-values account for tests across selected "
+        "assets; the volatility ratio is post-2024 divided by pre-2025. These "
+        "tests still assume independent observations, while returns can exhibit "
+        "volatility clustering. Interpret results as indicative alongside the "
+        "visualizations and effect sizes."
     )
 
-    st.markdown("### 6. Methodology and limitations")
+    st.markdown("### 7. Methodology and limitations")
     with st.expander("Data, calculations and limitations"):
         st.markdown(METHOD_NOTES)
 
-    export = returns[selected_for_risk].join(volumes, how="left", rsuffix="_volume")
+    return_export = returns[selected_for_risk].rename(
+        columns={asset: f"{asset}_log_return" for asset in selected_for_risk}
+    )
+    volume_export = volumes.reindex(columns=selected_for_risk).rename(
+        columns={
+            asset: f"{asset}_volume_percentile" for asset in selected_for_risk
+        }
+    )
+    export = return_export.join(volume_export, how="left")
     st.download_button(
         "Download selected returns and volume percentiles (CSV)",
         data=export.to_csv().encode("utf-8"),
