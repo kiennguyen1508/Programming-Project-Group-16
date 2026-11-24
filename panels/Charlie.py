@@ -570,7 +570,7 @@ def render():
             options = [0.90, 0.95, 0.99],
             value = 0.95,
             format_func = lambda c: f"{c:.0%}",
-            help = "How sure we want to be before calling a result significant. Higher means a wider confidence interval.",
+            help = "How strict the test is before calling a result significant. Higher means a wider confidence interval.",
             key = "cha_conf",
         )
     with col_robust:
