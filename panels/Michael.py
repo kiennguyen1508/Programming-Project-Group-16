@@ -811,11 +811,10 @@ def render():
     chosen_periods = list(dict.fromkeys(period for _, period in distribution_specs))
 
     if not volumes.empty:
-        source_lines = [
-            f"**{a}:** {volume_sources.get(a, 'Unavailable')}"
-            for a in chosen_assets
-        ]
-        st.caption("Volume sources — " + " | ".join(source_lines))
+        st.caption("Volume sources — " + " | ".join(
+            f"**{asset}:** {volume_sources.get(asset, 'Unavailable')}"
+            for asset in chosen_assets
+        ))
 
     missing_volume = [
         asset
