@@ -62,8 +62,8 @@ avoids a spurious regression, because prices trend over time and two trending se
 Before is 2015 to 2024, Boom runs from January 2025 to the peak, and Crash is everything after the peak.
 
 **Model.** OLS by matrix formula, β̂ = (X'X)⁻¹X'Y, written by hand with NumPy and checked against statsmodels
-in `charlie_regression.ipynb` (the estimates match exactly). In Silver vs Gold + Copper, each β̂ is ceteris paribus:
-it shows the effect of one metal holding the other constant.
+in `charlie_regression.ipynb` (the estimates and robust standard errors match exactly). In Silver vs Gold + Copper,
+each β̂ is ceteris paribus: it shows the effect of one metal holding the other constant.
 
 **Standard errors.** White robust standard errors by default (the HC1 version, with an n / (n - k - 1) correction),
 because daily return volatility is not constant over time (heteroskedasticity). The toggle switches to ordinary
