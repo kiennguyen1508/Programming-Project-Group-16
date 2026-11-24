@@ -216,7 +216,7 @@ def make_scatter(returns, y_name, regressors, period_dates, periods):
         xaxis_title = "Gold daily return (%)",
         yaxis_title = f"{y_name} daily return (%)",
         legend = dict(orientation = "h", y = 1.15),
-        margin = dict(l=10, r=10, t=30, b=10),
+        margin = dict(l = 10, r = 10, t = 30, b = 10),
     )
     return fig
 
@@ -224,7 +224,7 @@ def make_scatter(returns, y_name, regressors, period_dates, periods):
 def make_dot_whisker(by_period, regressors, period_dates, confidence, one_for_one=True):
     """
     Each beta as a dot with its confidence interval, one colour per period.
-    Dashed lines at 0 (no link) and 1 (one-for-one with gold).
+    Dashed lines at 0 (no link) and, for silver, at 1 (one-for-one with gold).
     """
     fig = go.Figure()
     for label in period_dates:
@@ -235,7 +235,9 @@ def make_dot_whisker(by_period, regressors, period_dates, confidence, one_for_on
         fig.add_trace(go.Scatter(
             x = rows["Beta"],
             y = rows["Regressor"],
-            mode = "markers",
+            mode = "markers+text",
+            text = rows["Beta"].round(2),
+            textposition = "top center",
             orientation = "h",
             name = label,
             marker = dict(size = 12, color = PERIOD_COLOURS[label]),
@@ -258,7 +260,7 @@ def make_dot_whisker(by_period, regressors, period_dates, confidence, one_for_on
         height = 150 + 80 * len(regressors),
         xaxis_title = f"Beta with {confidence:.0%} confidence interval",
         scattermode = "group",
-        margin = dict(l=80, r=10, t=40, b=50),
+        margin = dict(l = 80, r = 10, t = 40, b = 50),
     )
     return fig
 
@@ -309,7 +311,7 @@ def make_3d(returns, y_name, regressors, period_dates, label):
             camera = dict(eye = dict(x = 1, y = 2.1, z = 0.6),
                           center = dict(x = 0, y = 0, z = -0.25)),
         ),
-        margin = dict(l=0, r=0, t=40, b=0),
+        margin = dict(l = 0, r = 0, t = 40, b = 0),
     )
     return fig
 
@@ -497,7 +499,7 @@ def answer(by_period, relationship, confidence):
         text = (f"**Is silver a precious or an industrial metal?** {headline}\n\n"
                 f"In the {latest['Period']} period, holding the other metal constant, a 1% daily move in gold was associated "
                 f"with about a {latest['Beta']:.1f}% daily move in silver, and a 1% daily move in copper with about a "
-                f"{latest_copper['Beta']:.1f}% move.{evidence}")
+                f"{latest_copper['Beta']:.1f}% daily move.{evidence}")
 
     else:
         positive = (gold["CI low"] > 0).sum()
@@ -506,7 +508,7 @@ def answer(by_period, relationship, confidence):
         if clear == 0:
             headline = "No clear link."
         elif positive > 0 and negative > 0:
-            headline = "Yes, but not in the same direction."
+            headline = "The link changed direction."
         elif clear < n_periods:
             headline = "Only sometimes."
         elif negative == n_periods:
@@ -630,7 +632,8 @@ def render():
     elif view == "Dot and whisker":
         st.plotly_chart(make_dot_whisker(by_period, regressors, period_dates, confidence, one_for_one))
         st.caption("Each dot is β and the line through it is the confidence interval. "
-                   "If the line crosses 0, there is no clear link.")
+                   "If the line crosses 0, there is no clear link. For silver, if it crosses 1, "
+                   "silver's moves were not clearly different from gold's.")
     else:
         which = st.selectbox(
             "Period for the 3D view",
@@ -658,8 +661,8 @@ def render():
             key = "cha_download",
         )
     st.dataframe(by_period.round(3), hide_index = True, width = "stretch")
-    st.caption("Beta is the average move. CI low to CI high is the confidence interval, a range of plausible values for β. "
-               "n is the number of trading days.")
+    st.caption(f"Beta is {y_name.lower()}'s average daily move for each 1% daily move in the regressor. CI low to CI high "
+               "is the confidence interval, a range of plausible values for β. n is the number of trading days.")
 
     with st.expander("What the results mean", expanded = True):
         st.markdown("##### What β tells us")
@@ -715,8 +718,8 @@ def overview():
     crash_beta = by_period[by_period["Period"] == "Crash"]["Beta"].iloc[0]
 
     fig = make_dot_whisker(by_period, ["Gold"], PHASES, 0.95)
-    fig.update_layout(height = 300, xaxis_title = None, margin = dict(l=10, r=10, t=30, b=0))
+    fig.update_layout(height = 300, xaxis_title = None, margin = dict(l = 10, r = 10, t = 30, b = 0))
     fig.update_yaxes(showticklabels = False)
     st.plotly_chart(fig, config = {"staticPlot": True}, key = "cha_overview_chart")
     st.caption(f"After silver's peak on {SILVER_PEAK:%d %b %Y}, a 1% daily move in gold was associated "
-               f"with about a {crash_beta:.1f}% daily move in silver")
+               f"with about a {crash_beta:.1f}% daily move in silver.")
