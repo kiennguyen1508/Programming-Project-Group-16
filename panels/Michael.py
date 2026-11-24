@@ -946,13 +946,9 @@ def render():
     with st.expander("Data, calculations and limitations"):
         st.markdown(METHOD_NOTES)
 
-    return_export = returns[selected_for_risk].rename(
-        columns={asset: f"{asset}_log_return" for asset in selected_for_risk}
-    )
-    volume_export = volumes.reindex(columns=selected_for_risk).rename(
-        columns={
-            asset: f"{asset}_volume_percentile" for asset in selected_for_risk
-        }
+    return_export = returns[selected_for_risk].add_suffix("_log_return")
+    volume_export = volumes.reindex(columns=selected_for_risk).add_suffix(
+        "_volume_percentile"
     )
     export = return_export.join(volume_export, how="left")
     st.download_button(
