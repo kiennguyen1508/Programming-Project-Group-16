@@ -635,9 +635,10 @@ def render():
             st.caption("Each dot is one trading day. The lines show silver's move for each 1% daily move in gold, with copper held at its average.")
     elif view == "Dot and whisker":
         st.plotly_chart(make_dot_whisker(by_period, regressors, period_dates, confidence, one_for_one))
-        st.caption("Each dot is β and the line through it is the confidence interval. "
-                   "If the line crosses 0, there is no clear link. For silver, if it crosses 1, "
-                   "silver's moves were not clearly different from gold's.")
+        note = "Each dot is β and the line through it is the confidence interval. If the line crosses 0, there is no clear link."
+        if one_for_one:
+            note = note + " If it crosses 1, silver's moves were not clearly different from gold's."
+        st.caption(note)
     else:
         which = st.selectbox(
             "Period for the 3D view",
