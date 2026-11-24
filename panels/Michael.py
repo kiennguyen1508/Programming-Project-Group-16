@@ -1,15 +1,15 @@
 """
 Panel 4 — Distribution & Risk (Michael)
 
-Main visual: interactive 3D VOLCANO / joint probability-density surface.
+Main visual: interactive three-dimensional joint probability-density surface.
 X = daily return (%)
 Y = trading-volume percentile (0–100, calculated within each asset)
 Z = joint probability density of return and trading activity.
 
 Volume is fetched from Yahoo Finance. Where the index/futures contract has no
 usable volume history, a clearly labelled liquid ETF volume proxy is used.
-Volume percentiles, rather than raw share/contract counts, make activity
-positions comparable without pretending the underlying markets have equal size.
+Volume percentiles, rather than raw share or contract counts, support
+comparisons of relative activity across markets.
 
 This panel compares asset-period distributions and links them to downside-risk
 statistics, tail tests, historical VaR breaches and rolling volatility.
@@ -64,20 +64,21 @@ VOLUME_CACHE_CSV = DATA_DIR / "volume_percentiles.csv"
 VOLUME_CACHE_SOURCES = DATA_DIR / "volume_percentiles_sources.json"
 
 METHOD_NOTES = """
-**3D volcano.** The surface is a two-dimensional Gaussian kernel density
-estimate (KDE) of daily return and trading activity. X is daily log return in
-percent; Y is the asset's trading-volume percentile over its available history;
-Z is joint probability density. The volcano peak marks combinations of return
-and activity that occurred most frequently. It is a joint distribution, not a
-forecast or a causal relationship.
+**Joint probability-density surface.** The surface is a two-dimensional
+Gaussian kernel density estimate (KDE) of daily returns and trading activity.
+X represents daily log returns in percent; Y represents each asset's
+trading-volume percentile over its available history; Z represents estimated
+joint probability density. Higher-density regions indicate return and activity
+combinations that are more concentrated in the observed sample. This is a
+descriptive joint distribution, not a forecast or evidence of causation.
 
 **Volume treatment.** Futures volume is used where Yahoo Finance provides
 enough observations. Otherwise the panel uses a named ETF proxy (GLD, SLV,
 CPER, USO or SPY). Volume is converted to a percentile within each instrument
 so that 90 means unusually high activity for that instrument, not the same
 number of contracts or shares. ETF proxy volume is a measure of related-market
-activity and is not the exact volume of the futures/index series whose returns
-are plotted.
+activity; it is not the exact volume of the futures or index series whose
+returns are plotted.
 
 **Risk.** Annualised volatility = daily standard deviation × √252. 95% VaR is
 the fifth-percentile loss threshold; Expected Shortfall is the average loss
@@ -88,7 +89,7 @@ the cumulative wealth path reconstructed from log returns.
 **Tests.** KS compares the pre-2025 and post-2024 return distributions;
 Levene compares their variances. Standard p-values assume independent
 observations, while financial returns can exhibit volatility clustering.
-Interpret p-values alongside sample sizes, effect sizes and the graph.
+Interpret p-values alongside sample sizes, effect sizes and visual evidence.
 
 **Limitations.** 2026 is a partial year. Different markets have different
 trading hours and holidays. Futures can be affected by contract rolls. KDE
@@ -231,12 +232,12 @@ def period_slice(data, period):
     return data.iloc[0:0]
 
 
-def make_volcano_3d(returns, volumes, distribution_specs, bandwidth=1.0):
+def make_joint_distribution_3d(returns, volumes, distribution_specs, bandwidth=1.0):
     """
-    Draw one or two genuine 3D joint-distribution surfaces.
-    Each surface is a 2D KDE: X=daily return, Y=relative trading volume,
-    Z=joint probability density. Comparisons are side-by-side, never stacked
-    on top of one another, so the shape of each distribution remains visible.
+    Create 3D KDE surfaces for one or two asset-period distributions.
+
+    The axes represent daily return, relative trading-volume percentile, and
+    estimated joint probability density. Comparisons use separate scenes.
     """
     pairs = []
     for asset, period in distribution_specs:
@@ -511,8 +512,8 @@ def var_breach_table(returns, assets):
 def render():
     st.subheader("Distribution & Risk")
     st.caption(
-        "Research question: Did the relationship between daily price changes "
-        "and trading activity change after 2025, and was the change unique to Gold?"
+        "Research question: How has the relationship between daily price changes "
+        "and trading activity evolved since 2025, and was the change distinct for Gold?"
     )
 
     try:
@@ -531,12 +532,12 @@ def render():
     with st.spinner("Loading trading-volume histories from Yahoo Finance..."):
         volumes, volume_sources = load_volume_data(str(first_date), str(last_date))
 
-    st.markdown("### 1. Interactive 3D probability distribution")
+    st.markdown("### 1. Interactive 3D joint probability distribution")
     st.write(
-        "This is a joint distribution of daily price changes and trading activity. "
-        "The surface rises where that combination occurred most frequently. "
-        "Choose one distribution first; optionally compare it with a second "
-        "distribution in a separate 3D scene."
+        "This surface visualizes the joint distribution of daily price changes "
+        "and trading activity. Higher-density regions indicate combinations "
+        "that are more concentrated in the sample. Select an asset and period; "
+        "optionally compare a second distribution in a separate 3D scene."
     )
 
     c1, c2, c3 = st.columns([1.25, 1.15, 1])
@@ -549,22 +550,22 @@ def render():
         )
     with c2:
         selected_period = st.segmented_control(
-            "Year / period",
+            "Analysis period",
             PERIODS[:3],
             default=PERIODS[0],
             key="p4_primary_period",
         )
     with c3:
         bandwidth = st.select_slider(
-            "Surface smoothness",
+            "KDE bandwidth",
             options=[0.65, 0.8, 1.0, 1.2, 1.4],
             value=1.0,
             format_func=lambda x: f"{x:.2f}×",
-            key="p4_volcano_bandwidth",
+            key="p4_distribution_bandwidth",
         )
 
     compare_enabled = st.checkbox(
-        "Compare with a second asset or year",
+        "Compare with a second asset or period",
         value=False,
         key="p4_compare_enabled",
     )
@@ -581,7 +582,7 @@ def render():
             )
         with cc2:
             compare_period = st.segmented_control(
-                "Comparison year / period",
+                "Comparison period",
                 PERIODS[:3],
                 default=PERIODS[1],
                 key="p4_compare_period",
@@ -605,7 +606,7 @@ def render():
             + ". Check the Yahoo Finance symbols or remove the unavailable asset."
         )
     elif chosen_assets:
-        fig, error = make_volcano_3d(
+        fig, error = make_joint_distribution_3d(
             returns, volumes, distribution_specs, bandwidth
         )
         if error:
@@ -614,7 +615,7 @@ def render():
             st.plotly_chart(
                 fig,
                 width="stretch",
-                key="p4_volcano_3d",
+                key="p4_joint_distribution_3d",
                 config={"scrollZoom": True, "displaylogo": False},
             )
 
@@ -627,17 +628,17 @@ def render():
         "shown side-by-side rather than obscuring one another."
     )
 
-    with st.expander("How to interpret the 3D distribution", expanded=True):
+    with st.expander("Interpreting the joint distribution", expanded=True):
         st.markdown(
-            "- **High peak:** that combination of daily return and trading activity occurred frequently.\n"
-            "- **Wide spread along X:** daily returns are more dispersed, including larger gains or losses.\n"
-            "- **Wide spread along Y:** returns occur across a broader range of trading activity.\n"
-            "- **Long extension towards negative X:** larger downside movements occur in the distribution.\n"
-            "- **Separate peaks or ridges:** more than one common return/activity regime may be present.\n"
-            "- Compare the same asset before and after 2025, then compare whether peer assets changed by a similar amount."
+            "- **Higher-density regions:** return and trading-activity combinations are more concentrated in the sample.\n"
+            "- **Greater spread along X:** returns are more dispersed, including larger gains or losses.\n"
+            "- **Greater spread along Y:** observations span a wider range of relative trading activity.\n"
+            "- **Extension toward negative X:** the distribution includes larger downside returns.\n"
+            "- **Multiple peaks or ridges:** the sample may contain multiple common return/activity patterns.\n"
+            "- Compare each asset before and after 2025, then assess whether peer assets exhibit similar changes."
         )
 
-    st.markdown("### 2. Risk measures — quantify what the volcano shows")
+    st.markdown("### 2. Risk measures")
     selected_for_risk = chosen_assets or assets
     periods_for_risk = chosen_periods or ["2015–2024", "2025", "2026 YTD"]
     table = risk_table(returns, selected_for_risk, periods_for_risk)
@@ -652,7 +653,7 @@ def render():
         "downside risk. Volatility is annualised. Kurtosis is excess kurtosis."
     )
 
-    st.markdown("### 3. Did historical downside-risk limits still hold?")
+    st.markdown("### 3. Historical 95% VaR backtest")
     breaches = var_breach_table(returns, selected_for_risk)
     if not breaches.empty:
         st.dataframe(breaches.round(3), hide_index=True, width="stretch")
@@ -664,18 +665,18 @@ def render():
         "95% VaR threshold was exceeded more often than its nominal rate."
     )
 
-    st.markdown("### 4. When did risk change?")
+    st.markdown("### 4. Rolling volatility")
     window = st.select_slider(
         "Rolling volatility window", options=[21, 30, 60, 90],
         value=30, format_func=lambda d: f"{d} trading days",
-        key="p4_volcano_rolling_window"
+        key="p4_distribution_rolling_window"
     )
     st.plotly_chart(
         make_rolling_volatility(returns, selected_for_risk, window),
-        width="stretch", key="p4_volcano_rolling"
+        width="stretch", key="p4_distribution_rolling"
     )
 
-    st.markdown("### 5. Are the distribution changes statistically detectable?")
+    st.markdown("### 5. Statistical tests for distribution changes")
     tests = tests_table(returns, selected_for_risk)
     if not tests.empty:
         st.dataframe(tests.round(4), hide_index=True, width="stretch")
@@ -684,8 +685,9 @@ def render():
     st.caption(
         "KS tests compare full return distributions; Levene tests compare "
         "variances. Standard p-values assume independent observations. Daily "
-        "financial returns can be volatility-clustered, so treat these as "
-        "indicative and interpret them with the graph and effect sizes."
+        "financial returns can exhibit volatility clustering. Interpret the "
+        "results as indicative and consider them alongside the visualizations "
+        "and effect sizes."
     )
 
     st.markdown("### 6. Methodology and limitations")
@@ -697,7 +699,7 @@ def render():
         "Download selected returns and volume percentiles (CSV)",
         data=export.to_csv().encode("utf-8"),
         file_name="distribution_risk_returns_volume.csv",
-        mime="text/csv", key="p4_volcano_download"
+        mime="text/csv", key="p4_distribution_download"
     )
 
 
@@ -732,4 +734,4 @@ def overview():
             margin=dict(l=5, r=5, t=45, b=5),
             legend=dict(orientation="h", y=1.12)
         )
-        st.plotly_chart(fig, width="stretch", key="p4_volcano_overview")
+        st.plotly_chart(fig, width="stretch", key="p4_distribution_overview")
