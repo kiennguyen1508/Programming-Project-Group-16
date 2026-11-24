@@ -25,7 +25,7 @@ RELATIONSHIPS = {"Silver vs Gold": ("Silver", ["Gold"]),
 
 RELATIONSHIP_NOTES = {"Silver vs Gold": "How did silver react to gold's movements?",
                       "Silver vs Gold + Copper": "Is silver a precious metal like gold, or an industrial metal like copper?",
-                      "Oil vs Gold": "Did oil and gold move together, and did that change during the 2026 Iran tension?"}
+                      "Oil vs Gold": "Did oil and gold move together, and did that change in 2026, the year of the Iran tension?"}
 
 BETA_NOTES = {"Silver vs Gold": "β is silver's average daily move for each 1% daily move in gold. β = 1 means one-for-one, "
                                 "above 1 means silver's moves were bigger than gold's and below 1 means smaller. If the "
