@@ -97,8 +97,27 @@ Programming-Project-Group-16/
 ## The panels
 Each panel has its own "Method and Limitations" section in the app with the details.
 
-###  Panel 1: Charlie's panel
+###  Panel 1: Regression analysis of silver, oil and gold (Charlie O'Sullivan)
+**Question:** How did silver react to gold's movements through the 2025 boom and 2026 crash, does silver behave more like a precious or an industrial metal, and did the link between oil and gold change in 2026, the year of the Iran tension?
 
+**Link to the main question:** Gold is the explanatory variable in every regression, so each β shows how silver or oil moved with gold, and whether that changed after 2025.
+
+**Data:** Daily log returns of gold, silver and Brent oil from `prices.csv`, and copper from `macro.csv`, all loaded through `data_loader.py`. Silver rose 288% from the start of 2025 to its peak on 26 Jan 2026, then fell 57%. The data is split either at that peak (Before: 2015-2024, Boom: Jan 2025 to the peak, Crash: after the peak) or by calendar year (2015-2024, 2025, 2026 YTD).
+
+**What it shows:** Three regressions, each run separately for every chosen period.
+- **Silver vs Gold:** silver's average daily move for each 1% daily move in gold (β). β above 1 means silver's moves were bigger than gold's.
+- **Silver vs Gold + Copper:** a multiple regression with one β for each metal, holding the other constant, to see whether silver tracked gold (precious) or copper (industrial) more closely.
+- **Oil vs Gold:** whether oil and gold moved in the same direction, opposite directions, or had no clear link.
+
+The OLS estimates are calculated by hand with the matrix formula and checked against statsmodels in `charlie_regression.ipynb`. Each relationship has a scatter with fitted lines, a dot and whisker chart of each β with its confidence interval, and, for the copper regression, a rotatable 3D plane. Under the chart, a blue box answers the question in plain words, followed by the full results table (downloadable as a CSV). "What the results mean" explains each β, tests whether β changed significantly between periods (a z-test) and ends with a practical takeaway.
+
+**Controls:** relationship, how to split the data (boom and crash or calendar years) and which of those periods to include, chart type, confidence level (90%, 95% or 99%) and a toggle for White robust standard errors.
+
+**Key findings:**
+- Silver moved more than one-for-one with gold in every period: β was 1.51 before 2025, 1.30 in the boom and 1.93 in the crash. The rise from boom to crash was significant at the 95% level (z = 2.08) but not at 99%, so silver's daily moves were largest relative to gold's after the peak.
+- Holding copper constant, silver tracked gold more closely than copper in every period (β on gold 1.41, 1.15 and 1.60, against 0.26, 0.27 and 0.65 on copper), so it behaved more like a precious metal even during the boom.
+- Oil and gold had a small positive link from 2015 to 2024 (β = 0.23), no clear link in 2025, and a negative link in 2026 (β = -0.37, 95% CI -0.72 to -0.03). The change from 2025 to 2026 was significant (z = -2.38), but gold explained only about 3% of oil's daily moves, so the link was weak.
+- Robust standard errors matter here: in the crash, silver's standard error on gold is 0.28 with them and 0.09 without, because volatility after the peak was far from constant.
 
 ###  Panel 2: Performance and ratios (Kien Nguyen)
 **Question:** How has gold performed against the other assets, and does it actually protect investors when markets are stressed?
@@ -137,7 +156,7 @@ Gold, Silver, Oil and the S&P 500 use daily log returns. The other assets use th
 
 | Member | Panel | Shared work |
 |---|---|---|
-| Charlie | Silver vs gold regression | write this later |
+| Charlie O'Sullivan | Regression analysis of silver, oil and gold | write this later |
 | Kien Nguyen | Performance & ratios | Set up the repository and folder structure; built `data_loader.py` (price download, `get_prices()`, `get_returns()`) and later added the macro data (`get_macro()`, `get_macro_changes()`); built the overview grid in `app.py` and the dark theme; wrote the README apart from the other panel sections; kept `requirements.txt` up to date |
 | Matthew Herbert | Correlation heatmap | write this later |
 | Michael Gilgunn | Distribution & risk | write this later|
