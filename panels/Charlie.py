@@ -416,10 +416,14 @@ def takeaway(by_period, relationship):
     latest = gold.iloc[-1]
 
     if relationship == "Silver vs Gold":
-        if (gold["CI low"] > 1).sum() > 0:
+        above = (gold["CI low"] > 1).sum()
+        if above == len(gold):
             text = ("Silver acted like a geared version of gold: when gold moved, silver tended to move further in "
                     "the same direction. For someone holding silver, that means bigger gains when gold rises and "
-                    "bigger losses when it falls, which fits silver's boom and crash both being larger than gold's.")
+                    "bigger losses when it falls.")
+        elif above > 0:
+            text = ("In some periods silver moved further than gold, so holding silver was riskier than gold at "
+                    "times, but not consistently.")
         else:
             text = "Silver did not clearly move more than gold here, so holding silver was not clearly riskier than gold."
 
@@ -692,8 +696,8 @@ def render():
         boom_and_crash = ("Boom" in ran and "Crash" in ran) or ("2025" in ran and "2026 YTD" in ran)
         if relationship == "Silver vs Gold" and boom_and_crash:
             st.caption("Why might β dip in the boom and jump after the peak? β measures how far silver moved with gold "
-                       "on the same day, not how much it rose overall. In the boom, much of silver's rise came from its "
-                       "own drivers, such as industrial demand and tight supply, so its daily link to gold weakened. "
+                       "on the same day, not how much it rose overall. Some of silver's rise may have come from its own "
+                       "drivers, such as industrial demand and tight supply, which would weaken its daily link to gold. "
                        "After the peak, both sold off together and silver fell further. These are likely reasons, not "
                        "something the regression tests.")
 
