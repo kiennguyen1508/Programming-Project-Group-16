@@ -35,7 +35,7 @@ Using `python -m` makes sure the Streamlit inside the virtual environment is use
 The dashboard opens in your browser at http://localhost:8501.
 If that port is busy, Streamlit uses the next one (8502) and prints the address in the terminal.
 
-The shared price and macro data is saved in the `data/` folder. The Distribution & Risk panel also needs trading-volume history from Yahoo Finance: run the app once while online to download and save that data. Later runs use the local cache and work without internet.
+The shared price and macro data is saved in the `data/` folder. The Distribution & Risk panel also needs raw trading-volume history from Yahoo Finance: run the app once while online to download and save that data. Later runs use the local cache and work without internet.
 ## Using the dashboard
 
 The dashboard opens on an overview page with a preview of all four panels. Click **Open →** on any panel to see it in full with its controls, and **← Back to overview** to return. Each panel has a "Method and Limitations" section explaining how its results were calculated.
@@ -49,8 +49,8 @@ All data is daily, from 2 January 2015 to 30 October 2026. It comes from Yahoo F
 | `data/prices.csv` | Closing prices of gold futures (`GC=F`), silver futures (`SI=F`), Brent crude futures (`BZ=F`) and the S&P 500 (`^GSPC`). Only days when all four traded are kept. | Yahoo Finance |
 | `data/macro.csv` | US dollar index (`DX-Y.NYB`), copper futures (`HG=F`), a broad commodity ETF (`DBC`), the 10-year real yield (`DFII10`) and the VIX. Kept separate from the prices so that adding it did not change any panel's existing results. | Yahoo Finance, FRED, Cboe |
 | `data/VIX_History.csv` | Daily VIX history, used to build the VIX column in `macro.csv`. | Cboe |
-| `data/volume_percentiles.csv` | Cached, within-instrument daily volume percentiles used by the Distribution & Risk panel. Created the first time that panel loads while online. | Yahoo Finance |
-| `data/volume_percentiles_sources.json` | Labels identifying the futures volume series or ETF proxy used for each asset. | Yahoo Finance |
+| `data/volume_history.csv` | Cached daily raw trading volumes used to calculate trailing, within-instrument percentiles. Created the first time the Distribution & Risk panel loads while online. | Yahoo Finance |
+| `data/volume_history_sources.json` | Labels identifying the futures volume series or ETF proxy used for each asset. | Yahoo Finance |
 
 ### Refreshing the data
 
@@ -61,7 +61,7 @@ python data_loader.py           # re-downloads prices.csv
 python data_loader.py macro     # re-downloads macro.csv
 ```
 
-The risk panel refreshes its volume cache when its saved history does not cover the dates in `prices.csv`. To force a refresh for the same dates, remove `data/volume_percentiles.csv` and `data/volume_percentiles_sources.json`, then restart the app while online. To run the project on another computer without internet, copy these generated cache files along with the repository's existing `data/` files.
+The risk panel refreshes its volume cache when saved history does not cover the analysis periods or a source is unavailable. To force a refresh for the same dates, remove `data/volume_history.csv` and `data/volume_history_sources.json`, then restart the app while online. The older `volume_percentiles` cache files, if present, contain full-sample ranks and are no longer used. To run the project on another computer without internet, copy the new volume cache files along with the repository's existing `data/` files.
 
 ### Using the data in a panel
 
@@ -150,7 +150,45 @@ Gold, Silver, Oil and the S&P 500 use daily log returns. The other assets use th
 - ***Rolling Graph:*** How the correlation between two assets changes over time, with a shaded 95% confidence band. Shaded boxes mark the COVID crash, the Ukraine war and rate hikes, and the selected period. A dotted line marks the silver peak (26 Jan 2026). Dotted average lines compare before and during the selected period, and a row of cards shows the latest, average, lowest and highest r. A second pair can be added for comparison.
 - ***Animated Timeline:*** One heatmap per year from 2015 to 2026, played with a Play button or a year slider, to show how the links shift year by year. 2026 covers January to October only.
 - ***Decoupling Analysis:*** Compares the selected period with all the days before it. A table ranks every pair by how much its correlation changed, with a Fisher z-test p-value for each change, and can be downloaded as a CSV. It can also be shown as a heatmap of the changes. The "Pair in Focus" section then tests one chosen pair and says in plain words whether the change is real or just random noise.
-###  Panel 4: Michael's panel
+
+**Controls:** An assets picker; Quick Period Select buttons (Before, Boom, Crash, 2025 Onwards); a time period slider; and a significance level slider (0.01 to 0.20, default 0.05). The Rolling Graph has its own "Comparing" and "Against" dropdowns and a smoothing window slider (30 to 250 days, default 90). Controls that do nothing on a view are hidden on that view.
+**Key findings and Interpretations:**
+- Over the whole period, gold's strongest link is with silver (r = 0.77). Gold moves against the dollar (r = -0.38) and against real yields (r = -0.30), and has almost no link with the S&P 500, oil or the VIX.
+- Gold's link with real yields mostly faded after 2025. It went from -0.36 before 2025 to -0.10 since, which is a significant change (Fisher z-test, p < 0.001). The textbook "higher real yields hurt gold" link broke down during the boom.
+- 25 of the 36 pairs changed significantly after 2025. The biggest changes are in oil, which almost stopped moving with the S&P 500 (0.28 to -0.09) and copper (0.28 to -0.06).
+- Gold and silver stayed tightly linked throughout. Their 90-day rolling correlation never fell below 0.50, and in the crash after the silver peak it rose to 0.84, higher than in the boom (0.64).
+- In the crash, gold started moving with the S&P 500 (r = 0.36, against roughly zero before) and against the VIX (r = -0.30). This suggests gold was sold off alongside stocks rather than acting as a safe haven.
+
+**Limitations:** Correlation only measures straight-line links and says nothing about cause. Daily closing times differ across markets, which can weaken some links. Rolling correlations depend on the window chosen, and the boom and crash periods are short, so their estimates are less certain.
+
+### Panel 4: Distribution & Risk (Michael Gilgunn)
+**Question:** How has the relationship between daily price movements and trading activity evolved since 2025, and how does this compare across different assets?
+
+**Code and data:** The panel is implemented in `panels/Michael.py` and loaded by `app.py`. It uses Streamlit for the interface, Pandas and NumPy for data processing, Plotly for charts, SciPy for statistical analysis and `yfinance` to retrieve trading volume.
+
+- `data/prices.csv` provides daily prices for Gold, Silver, Oil and the S&P 500. The panel loads their daily log returns through `get_returns()` in `data_loader.py`.
+- `data/macro.csv` provides the Copper price series. The panel obtains Copper returns through `get_macro()` and `get_macro_changes()`, using the same log-return basis as the other assets.
+- Daily volume comes from Yahoo Finance. Futures volume is used when the data has sufficient coverage; otherwise, the panel uses a labelled ETF proxy: GLD, SLV, CPER, USO or SPY. `data/volume_history_sources.json` records the source used for each asset.
+
+Volume histories are cached locally in `data/volume_history.csv`, so once downloaded they can be reused without repeatedly contacting Yahoo Finance. The panel converts each instrument's raw volume into a trailing 252-observation percentile, using only observations available up to that date. A percentile near 90 indicates relatively high activity for that instrument; it does not mean the same number of shares or contracts across markets. The percentile series is aligned by date with the return data before analysis.
+
+**Periods:** The analysis uses 1 January 2025 as the dividing date. Results are available for 2015–2024, 2025, 2026 year-to-date and since 2025. The 2026 period is partial and should not be treated as a full-year result.
+
+**What it shows:**
+
+- **Joint probability distribution:** A two-dimensional Gaussian kernel density estimate (KDE) is rendered as an interactive 3D surface. The X-axis is daily log return in percent, the Y-axis is trailing volume percentile from 0 to 100, and the Z-axis is estimated joint density. Higher areas indicate return-and-activity combinations that are more concentrated in the selected sample. This describes historical observations; it is not a forecast or evidence that volume causes a return.
+- **Side-by-side comparison:** Select one asset and period, then optionally add a second asset or period. The 3D scenes share a density-axis scale, and accompanying 2D contour plots share a colour scale, making differences in shape and concentration easier to compare. Reflected KDE observations reduce estimation bias near the percentile boundaries of 0 and 100.
+- **Risk measures:** A table reports observation count, mean daily return, annualised volatility, 95% Value at Risk (VaR), 95% Expected Shortfall, skewness, excess kurtosis and maximum drawdown. Annualised volatility is daily standard deviation multiplied by the square root of 252. VaR is the fifth-percentile daily loss; Expected Shortfall is the average loss among observations at or below that threshold. Maximum drawdown is calculated from the wealth path reconstructed from log returns.
+- **Historical VaR backtest:** Each asset's 2015–2024 fifth-percentile loss threshold is held fixed and tested against returns since 2025. The table reports the number and rate of breaches against the nominal 5% rate. Kupiec's test evaluates whether the overall breach rate matches the expected rate; Christoffersen's test evaluates whether breaches are independent over time.
+- **Rolling volatility:** A time-series chart displays annualised volatility using a selectable window of 21, 30, 60 or 90 trading days. It marks the start of 2025 to help identify when volatility changed relative to the analysis split.
+- **Trading activity and return magnitude:** For each asset, the panel groups observations into low- and high-volume terciles within 2015–2024 and since 2025. It compares mean absolute daily log returns in the two groups, reports the high-minus-low gap, and calculates how that gap changed between periods. For Gold, it also compares its change with the average change for the available peer assets.
+- **Distribution and variance tests:** Kolmogorov–Smirnov tests compare the pre-2025 and post-2024 return distributions, while Levene tests compare their variances. The table includes a post/pre volatility ratio, sample sizes and Holm-adjusted p-values to account for testing multiple selected assets.
+
+**Controls and export:** Choose an asset and period for the main display, enable a second selection to compare distributions, and adjust KDE bandwidth from 0.65× to 1.4× to change the smoothing of the estimated surface. The panel labels the volume source used for each selected asset. A CSV download contains the selected assets' log returns and corresponding volume percentiles with clearly labelled columns.
+
+**Interpreting the results:** A wider distribution along the return axis indicates more dispersed daily returns; movement toward negative returns indicates downside observations. In the activity table, a positive high-minus-low gap means mean absolute returns were larger in the high-volume group for that period. A positive Gold-versus-peer change means Gold's high-minus-low gap increased more—or decreased less—than the peer average. These comparisons are descriptive and are not causal estimates.
+
+**Limitations:** ETF volume is a proxy for activity in a related market, not the exact volume of the futures or index whose returns are analysed. Continuous futures contracts can show volume disruptions around contract rolls. Early volume percentiles use fewer than 252 observations, and risk rows with fewer than 250 observations are flagged because tail estimates are less stable. The 2026 sample is incomplete. KS, Levene, Kupiec and Christoffersen p-values rely on assumptions that may not hold for clustered financial returns; the reported tests should therefore be treated as indicative rather than definitive. Historical distributions and backtests do not predict future performance.
 
 ## Contributions
 
@@ -158,7 +196,7 @@ Gold, Silver, Oil and the S&P 500 use daily log returns. The other assets use th
 |---|---|---|
 | Charlie O'Sullivan | Regression analysis of silver, oil and gold | write this later |
 | Kien Nguyen | Performance & ratios | Set up the repository and folder structure; built `data_loader.py` (price download, `get_prices()`, `get_returns()`) and later added the macro data (`get_macro()`, `get_macro_changes()`); built the overview grid in `app.py` and the dark theme; wrote the README apart from the other panel sections; kept `requirements.txt` up to date |
-| Matthew Herbert | Correlation heatmap | write this later |
+| Matthew Herbert | Correlation heatmap | Built Panel 3 (`panels/Matthew.py`): the significance-masked correlation heatmap, the rolling correlation graph with confidence bands and event shading, the year-by-year animated timeline, and the Decoupling Analysis with Fisher z-tests and the ranked change table. Wrote README for Panel 3. Assisted in layout of dashboard. Troubleshoot email relating to commits and later push/pull problems. Debugging. |
 | Michael Gilgunn | Distribution & risk | write this later|
 
 ## Limitations

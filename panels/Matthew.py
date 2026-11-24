@@ -420,13 +420,35 @@ def render():
     # 5. Method and Limitations Dropdown box (if needed?, not sure yet but as a test will add.)
     with st.expander("Method and Limitations"):
         st.markdown("""
-This panel compares the daily returns of gold, silver, oil, the S&P 500
-and other key macro measure since 2015. Each cell shows the Pearson correlation
-for the chosen period, and cells that could be down to chance (with p-values
-above the cutoff that you select from 0.01 to 0.20 (for now)) are hidden.
-Correlation is not causation, and short periods give less reliable results etc etc.
-This is just a test paragraph for now, I'm not sure if this is necessary. 
-More detail can be added later if we decide...
+**Data:** Daily closing prices of gold, silver, Brent oil and the S&P 500 from Yahoo Finance
+(`data/prices.csv`), plus Commodities, the Dollar index, Copper, the 10-year real yield
+and the VIX from `data/macro.csv`. Only days where every series has a
+value are kept (2,925 trading days, January 2015 to October 2026).
+
+**Returns:** Gold, silver, oil and the S&P 500 use daily log returns. The other assets use the
+daily percentage change, except the real yield, which uses the daily change in percentage points because
+it is already a rate. Correlating returns rather than prices avoids finding false links between
+assets that simply both trended upwards.
+
+**Correlation and significance:** Each cell is the Pearson correlation (r) between two assets'
+daily returns for the chosen period. A cell is marked "n.s." when its p-value is above the
+significance level picked on the slider (default 0.05), meaning the link could be down to chance.
+
+**Rolling graph:** The correlation is recalculated over a moving window of days (default 90).
+A longer window gives a smoother but slower line. The shaded band is a 95 percent confidence interval
+using the Fisher z-transformation.
+
+**Decoupling analysis.** Compares each pair's correlation in the chosen period with all the days
+before it. A Fisher z-test checks whether the change is bigger than chance would explain. The
+ranking table orders pairs by the size of the change and greys out changes that are not significant.
+
+**Limitations.** Correlation only measures straight-line links and does not show cause and effect.
+Markets close at different times (for example oil and US stocks), which can weaken some daily links.
+Pearson r is sensitive to a few extreme days, such as the COVID crash. The Fisher z-test assumes each
+day is independent, which is not fully true for financial returns, so p-values may be slightly too
+small. Short periods (such as the Crash period, or 2026 in the timeline, which only runs to October)
+give less reliable results, and the rolling graph depends on the window size chosen. With 36 pairs
+tested at once, a few will look significant by chance alone.
 """)
 
 
