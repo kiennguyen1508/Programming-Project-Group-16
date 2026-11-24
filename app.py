@@ -67,7 +67,7 @@ def overview_card(key, info):
 # 4. Draw the page
 if st.session_state.focus is None:
     st.caption("PROGRAMMING PROJECT · GROUP 16")
-    st.title("What Drives Gold? An Interactive Analysis of Returns, Correlations, Risk and Market Links: 2015-2026.", anchor=False)
+    st.title("What Drives Gold? An Interactive Analysis of Returns, Correlations, Risk and Market Links", anchor=False)
     st.caption("Daily data from 2015 to Oct 2026. Open any panel to explore it in full.")
     keys = list(PANELS)
     for row in (keys[:2], keys[2:]):          # two rows of two
