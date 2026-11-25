@@ -537,7 +537,7 @@ def performance_stats(prices, risk_free = RISK_FREE_RATE):
     
 
 def price_summary(stats):
-    """One-sentence takeaway from the performance table."""
+    """Takeaway from the performance table: the numbers, then what they mean for an investor."""
     if stats.empty:
         return ""
     best = stats["Total return"].idxmax()
@@ -547,17 +547,22 @@ def price_summary(stats):
         first = (f"**{best}** returned the most ({stats.loc[best, 'Total return']:+.0%}) "
                  f"and also had the best risk-adjusted return "
                  f"(Sharpe {stats.loc[best, 'Sharpe ratio']:.2f}).")
+        meaning = (f" For an investor, {best} was the better choice on both counts in this period, "
+                   f"though past performance does not predict future returns.")
     else:
         first = (f"**{best}** returned the most ({stats.loc[best, 'Total return']:+.0%}), "
                  f"but **{safest}** had the best risk-adjusted return "
                  f"(Sharpe {stats.loc[safest, 'Sharpe ratio']:.2f}).")
+        meaning = (f" For an investor, {best}'s extra return came with more risk: you had to sit through a "
+                   f"{abs(stats.loc[best, 'Max drawdown']):.0%} fall from its peak to get it, while {safest} "
+                   f"gave more return for each unit of risk.")
     second = (f" **{deepest}** had the deepest fall from a peak "
               f"({stats.loc[deepest, 'Max drawdown']:.0%}).")
-    return first + second
+    return first + second + meaning
 
 
 def ratio_summary(name, top, bottom, stats):
-    """One-sentence reading of where the ratio sits today."""
+    """Where the ratio sits today, then what that means for an investor."""
     z = stats["z"]
     if z > 2:
         level = "at a historical extreme high"
@@ -569,9 +574,19 @@ def ratio_summary(name, top, bottom, stats):
         level = "below its long-run average"
     else:
         level = "close to its long-run average"
-    return (f"The {name} ratio is **{stats['current']:.1f}**, {level}: higher than on "
+    text = (f"The {name} ratio is **{stats['current']:.1f}**, {level}: higher than on "
             f"{stats['percentile']:.0f}% of days since 2015. A high ratio means "
             f"{bottom.lower()} is cheap relative to {top.lower()}.")
+
+    if z > 1:
+        text += (f" For an investor, {bottom.lower()} looks cheap next to {top.lower()} by historical standards. "
+                 "The reversion test below shows whether readings like this have tended to swing back.")
+    elif z < -1:
+        text += (f" For an investor, {bottom.lower()} looks expensive next to {top.lower()} by historical standards. "
+                 "The reversion test below shows whether readings like this have tended to swing back.")
+    else:
+        text += " For an investor, neither looks unusually cheap compared with the other right now."
+    return text
 
 
 def regime_returns(prices, vix, threshold, measure="mean"):
