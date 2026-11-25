@@ -40,6 +40,8 @@ Price and macro data are stored in `data/`. The Distribution & Risk panel also u
 
 The dashboard opens on an overview page with a preview of all four panels. Select **Open →** to view a panel and its controls, then **← Back to overview** to return. Each panel includes a **Method and Limitations** section describing its calculations and caveats.
 
+![Overview page with a preview of all four panels](assets/overview.png)
+
 ## Data
 
 All data is daily, from 2 January 2015 to 30 October 2026. It comes from Yahoo Finance, FRED (Federal Reserve Bank of St. Louis) and Cboe.
@@ -120,6 +122,8 @@ Each panel has its own "Method and Limitations" section in the app with the deta
 
 The OLS estimates are calculated by hand with the matrix formula and checked against statsmodels in `charlie_regression.ipynb`. Each relationship has a scatter with fitted lines, a dot and whisker chart of each β with its confidence interval, and, for the copper regression, a rotatable 3D plane. Under the chart, a blue box answers the question in plain words, followed by the full results table (downloadable as a CSV). "What the results mean" explains each β, tests whether β changed significantly between periods (a z-test) and ends with a practical takeaway.
 
+![Panel 1: silver's β on gold before, during and after the boom, with confidence intervals](assets/panel1_regression.png)
+
 **Controls:** Relationship, period scheme (boom/crash or calendar years), selected periods, chart type, confidence level (90%, 95% or 99%) and a toggle for White robust standard errors.
 
 **Key findings:**
@@ -154,31 +158,37 @@ The OLS estimates are calculated by hand with the matrix formula and checked aga
 
 **9. Sample size after each step.** Full period: 2,971 return days, of which 391 are stressed (VIX ≥ 25 the day before) and 2,580 calm. Since 2025: 458 return days, of which only 34 are stressed and 424 calm.
 
+**10. Testing whether the stress-day gap is real.** Each asset's stressed-day returns are compared with its calm-day returns using Welch's t-test (`scipy.stats.ttest_ind` with `equal_var=False`). Welch's version is used instead of the standard t-test because returns are much more volatile on stressed days, so the two groups do not have the same variance.
+
 #### What you see
-Three tabs:
-1. **Performance:** a chart (Growth of 100, Drawdown or Replay) and a table of total return, annualised return, volatility, maximum drawdown, Sharpe ratio and Sortino ratio, with the best value in each column highlighted. A text box summarises the table.
-2. **Stress days:** each asset's average (or median) daily return on calm days and on stressed days.
+Three tabs, each ending with a green "What to take away" box that states the result and what it means for an investor:
+1. **Performance:** a chart (Growth of 100, Drawdown or Replay) and a table of total return, annualised return, volatility, maximum drawdown, Sharpe ratio and Sortino ratio, with the best value in each column highlighted.
+2. **Stress days:** each asset's average (or median) daily return on calm days and on stressed days, and a Welch t-test table showing the gap, t-statistic, p-value and whether the gap is significant at 5%.
 3. **Ratios:** the gold/silver, gold/oil and gold/copper ratios with their 2015–2026 average and ±1σ/±2σ bands, plus the latest value in the saved data, z-score and percentile. Below this, the reversion test shows how often a ratio moved back towards its average after being more than 2σ away, alongside a base rate (how often it moved that way on any day).
 
 #### How to read it
 - **Sharpe and Sortino:** return per unit of risk; higher is better. Sortino only counts days below the risk-free rate as risk.
 - **Drawdown:** how far an asset is below its previous peak; closer to 0% is better.
 - **Stress days:** if gold protects investors, its stressed-day bar should be at or above its calm-day bar and above the S&P 500's.
+- **p-value:** below 0.05 means the gap between stressed and calm days is unlikely to be chance. Above 0.05, the bars may look different but the gap could be noise.
 - **Reversion test:** the signal only means something if "Moved back towards mean" is clearly higher than the base rate.
 
+![Panel 2, Stress days tab: calm vs stressed returns, Welch t-test and takeaway (Max, VIX 25)](assets/panel2_stress_days.png)
+
 #### Controls
-Period (Since 2025, YTD, 1Y, 5Y, Max; default Since 2025), asset picker and a "Start from" slider. Performance tab: chart type (Growth of 100, Drawdown, Replay), log-scale toggle and risk-free rate slider (0–6%, default 4%). Stress days tab: VIX threshold (15–40, default 25) and Average/Median. Ratios tab: ratio picker and look-ahead horizon (1, 3 or 6 months). A CSV download of the prices and a "Method and Limitations" section are at the bottom of the panel.
+Period (Since 2025, YTD, 1Y, 5Y, Max; default Since 2025), asset picker and a "Start from" slider. Performance tab: chart type (Growth of 100, Drawdown, Replay), log-scale toggle and risk-free rate slider (0–6%, default 4%). Stress days tab: VIX threshold (15–40, default 25) and Average/Median. Ratios tab: ratio picker and look-ahead horizon (1, 3 or 6 months). A CSV download of the prices and a "Method and limitations" section are at the bottom of the panel.
 
 #### Key findings
 Saved data to 30 Oct 2026; the settings to reproduce each finding are in brackets.
 - **Since 2025, gold earned more but became riskier.** Annualised return 23.2% with 25.1% volatility and a Sharpe ratio of 0.80, the highest of the four assets, against 10.6%, 16.8% and 0.45 over the full period. Silver and oil returned more since 2025 (32.1% and 27.2%) but with far higher volatility (52.8% and 45.1%). *[Performance, Since 2025 vs Max]*
 - **Gold is in its deepest fall since 2015.** It peaked at $5,318 on 29 Jan 2026 and closed at $3,899 on 30 Oct 2026, a 26.7% drawdown. That is deeper than any fall from 2015 to 2024 (the worst was about 21%). *[Performance, Max, Drawdown]*
-- **Gold did not reliably protect investors on fear days.** On the 391 stressed days, gold averaged +0.01% a day against +0.05% on calm days, while the S&P 500 averaged +0.13% on stressed days. The median gives the same ranking. *[Stress days, Max, VIX 25]*
-- **Since 2025 gold did rise on stressed days, but so did everything else.** On the 34 stressed days, gold averaged +0.18% (+0.09% on calm days), but the S&P 500 averaged +0.28% and silver +0.27%. This looks like markets bouncing back after fear spikes, not gold protecting investors, and 34 days is a small sample. *[Stress days, Since 2025, VIX 25]*
+- **Gold did not reliably protect investors on fear days.** On the 391 stressed days, gold averaged +0.01% a day against +0.05% on calm days, while the S&P 500 averaged +0.13% on stressed days. The median gives the same ranking. None of the gaps is statistically significant (Welch t-test: gold p = 0.53, S&P 500 p = 0.41), so gold behaved about the same on fear days as on normal days. *[Stress days, Max, VIX 25]*
+- **Since 2025 gold did rise on stressed days, but so did everything else.** On the 34 stressed days, gold averaged +0.18% (+0.09% on calm days), but the S&P 500 averaged +0.28% and silver +0.27%. None of these gaps is significant at 5% (gold p = 0.83). This looks like markets bouncing back after fear spikes, not gold protecting investors, and 34 days is a small sample. *[Stress days, Since 2025, VIX 25]*
 - **Only the gold/silver ratio reliably moved back to its average.** After being more than 2σ from its rolling 5-year average, it moved back within 3 months 81% of the time, against a base rate of 43–57%. Gold/oil (53% vs 47%) and gold/copper (54% vs 45%) were barely better than chance. Today the gold/silver ratio is 79.4, right at its average (z = −0.04, 50th percentile), so there is no signal now. *[Ratios, 3 months]*
 
 #### Limitations
 - The "since 2025" period is under two years and has only 34 stressed days, so those results are less certain than the full-period ones.
+- The t-test assumes each day is independent, but stressed days come in runs (volatility clusters), so the p-values are only approximate. Four assets are tested at once, so one "significant" result could appear by chance.
 - The reversion test counts overlapping days (259 above +2σ and 105 below −2σ for gold/silver), so the number of independent episodes is much smaller than the day counts suggest.
 - Ratios can spike far upwards but cannot fall below zero, so the σ bands are only approximate. The percentile is more reliable.
 - The risk-free rate is fixed for the whole period (default 4%), but cash rates were near zero until 2022, so Sharpe and Sortino over Max are only approximate.
@@ -219,6 +229,8 @@ The Animated Timeline groups the data by calendar year, with about 245 to 249 da
 - ***Rolling Graph:*** How the correlation between two assets changes over time, with a shaded 95% confidence band. Shaded boxes mark the COVID crash, the Ukraine war and rate hikes, and the selected period. A dotted line marks the silver peak (26 Jan 2026). Dotted average lines compare before and during the selected period, and a row of cards shows the latest, average, lowest and highest r. A second pair can be added for comparison.
 - ***Animated Timeline:*** One heatmap per year from 2015 to 2026, played with a Play button or a year slider, to show how the links shift year by year. 2026 covers January to October only.
 - ***Decoupling Analysis:*** Compares the selected period with all the days before it. A table ranks every pair by how much its correlation changed, with a Fisher z-test p-value for each change, and can be downloaded as a CSV. It can also be shown as a heatmap of the changes. The "Pair in Focus" section then tests one chosen pair and says in plain words whether the change is real or just random noise.
+
+![Panel 3: correlation heatmap since January 2025, with non-significant pairs marked n.s.](assets/panel3_heatmap.png)
 
 **Controls:** An assets picker; Quick Period Select buttons (Before, Boom, Crash, 2025 Onwards); a time period slider; and a significance level slider (0.01 to 0.20, default 0.05). The Rolling Graph has its own "Comparing" and "Against" dropdowns and a smoothing window slider (30 to 250 days, default 90). Controls that do nothing on a view are hidden on that view.
 **Key findings and interpretations:**
@@ -271,6 +283,8 @@ Volume data is cached locally in `data/volume_history.csv`, so it does not need 
 - **Trading Activity and Return Magnitude:** Observations are divided into low- and high-volume terciles within 2015–2024 and since 2025. The panel compares mean absolute daily log returns between the two groups, calculates the high-minus-low difference and examines how this relationship changed after 2024. Gold's change is also compared against the average change across the available comparison assets.
 
 - **Distribution and Variance Tests:** Kolmogorov–Smirnov tests compare the pre-2025 and post-2024 return distributions, while Levene tests examine whether their variances differ. The results include the post/pre volatility ratio, sample sizes and Holm-adjusted p-values to account for multiple hypothesis testing.
+
+![Panel 4: 3D joint distribution and contour plot of gold's daily returns and trading-volume percentile, 2015–2024](assets/panel4_distribution.png)
 
 **Controls:** Asset and period selection, with the option to add a second asset or period for distribution comparisons. The KDE bandwidth can be adjusted from 0.65× to 1.4× to control the smoothing of the estimated density surface. The panel also displays the volume source used for each asset. A CSV download provides the selected assets' daily log returns and corresponding volume percentiles.
 
