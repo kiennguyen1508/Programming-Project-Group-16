@@ -7,8 +7,8 @@ st.set_page_config(page_title="What Drives Gold? An Interactive Analysis of Retu
 #    and the function that draws the full panel
 PANELS = {
     "regression" : {
-        "title" : "Regression Analysis: Silver, Oil and Gold",
-        "question" : "How much does silver move with gold, and did that change through its boom and crash?",
+        "title" : "Regression Analysis",
+        "question" : "How closely do silver and oil move with gold, and has that changed since 2025?",
         "full" : Charlie.render,
         "preview": getattr(Charlie, "overview", None),
     },
