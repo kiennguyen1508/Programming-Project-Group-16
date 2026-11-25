@@ -295,6 +295,7 @@ def set_period(name, first, last):
 def render():
     """Draw Panel 3 on the dashboard"""
     st.subheader("Correlation Heatmap")
+    st.caption("By Matthew Herbert | Data: Yahoo Finance, FRED and Cboe daily data")
     returns = get_returns().join(load_macro(), how="inner").dropna()
 
     # 1. Controls
