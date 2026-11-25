@@ -154,6 +154,24 @@ The OLS estimates are calculated by hand with the matrix formula and checked aga
 Gold, Silver, Oil and the S&P 500 use daily log returns. The other assets use the daily percentage change, apart from the real yield, which uses the daily change in percentage points. In certain trading days, there is not complete data on each of the analysed and used assets. In these cases, the trading day as a whole is excluded, leaving apporximately 
 2,900 complete trading days from Jan 2015, to October 2026, which my panel uses.
 
+**Data Preprocessing:**
+**1. Loading the data.** The panel uses two saved files, so it runs without internet:
+- `data/prices.csv` (2,972 trading days, 2 Jan 2015 to 30 Oct 2026): Gold, Silver, Brent Oil and the S&P 500. It is read through the shared `get_returns()` function in `data_loader.py`.
+- `data/macro.csv` (2,980 days over the same dates): Commodities (DBC), the Dollar index, Copper, the 10-year real yield and the VIX. It is read directly by the panel's own `load_macro()` function, with the Date column parsed as the index.
+**2. Turning prices into returns.** Correlating price levels would show false links between any two assets that both trended upwards over time, so every series is first turned into a daily change:
+- Gold, Silver, Oil and the S&P 500 use daily log returns, ln(Pₜ / Pₜ₋₁), the same definition every panel uses.
+- Commodities, the Dollar, Copper and the VIX use the daily % change (`pct_change()`).
+- The real yield is already a rate, so a % change of a yield near zero would give huge, meaningless numbers. It uses the daily change in percentage points instead (`diff()`).
+The first day of each series is lost, because a change needs a previous day.
+**3. Matching the dates.** The two tables are combined with an inner join, so only dates found in both files are kept (2,971 days). The markets do not share an identical calendar, and `macro.csv` has a few gaps: 25 missing real yield values (US bond market holidays), 5 for Copper and Commodities, 4 for the Dollar and 1 for the VIX. A gap blanks the change on that day and the next, so the real yield ends up with 44 blank days.
+**4. Removing incomplete days.** `dropna()` removes any day with a blank in any column, leaving **2,925 complete trading days** (46 removed, about 1.5%). This means every correlation in the panel uses exactly the same days, so pairs can be compared fairly. No values are filled in or estimated. A check found no infinite values after the % changes.
+**5. Splitting by period.** The shared `SPLIT` date (1 Jan 2025) and the silver peak (26 Jan 2026) divide the data for the quick period buttons:
+- Before: 2,475 days (Jan 2015 to Dec 2024)
+- Boom: 259 days (1 Jan 2025 to 26 Jan 2026)
+- Crash: 191 days (27 Jan 2026 to Oct 2026)
+The Animated Timeline groups the data by calendar year, with about 245 to 249 days per year, except 2025 (243) and 2026 (207, January to October only).
+**6. Preparing for the statistics.** Correlations are clipped to between -0.999 and +0.999 before the Fisher z-transform (arctanh), since a correlation of exactly ±1 would give an infinite value. The rolling correlation needs a full window before it starts, so the first 29 to 249 days (depending on the window chosen) have no value and are dropped from the graph.
+
 **What Panel 3 Shows:**
 - ***Correlation Heatmap:*** A staircase heatmap of the Pearson correlation (r) for every pair of chosen assets. Gold means the pair moves together and blue means they move in opposite directions. Pairs that are not significant at the chosen level are greyed out and marked "n.s.", so the eye goes only to the links that are real.
 - ***Rolling Graph:*** How the correlation between two assets changes over time, with a shaded 95% confidence band. Shaded boxes mark the COVID crash, the Ukraine war and rate hikes, and the selected period. A dotted line marks the silver peak (26 Jan 2026). Dotted average lines compare before and during the selected period, and a row of cards shows the latest, average, lowest and highest r. A second pair can be added for comparison.
