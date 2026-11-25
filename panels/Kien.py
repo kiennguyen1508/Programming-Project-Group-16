@@ -83,7 +83,8 @@ def show_ratios(prices, recent):
                 help = "How many standard deviations today's ratio is from its 2015-2026 average")
     c3.metric("Percentile" , f"{stats['percentile']:.0f}%",
                 help = "Share of days since 2015 when the ratio was lower than today")
-    st.info(ratio_summary(name,top,bottom,stats))
+    st.markdown("##### What to take away")
+    st.success(ratio_summary(name,top,bottom,stats))
     st.markdown("**Do extreme readings revert?**")
     horizon = st.select_slider(
         "Look-ahead horizon",
@@ -132,7 +133,8 @@ def show_stress(chosen):
         if min(n_stressed, n_calm) < 20:
             st.warning("One group has fewer than 20 days, so its result is unreliable.")
         st.plotly_chart(make_regime_chart(table, measure))
-        st.info(regime_summary(table, measure))
+        st.markdown("##### What to take away")
+        st.success(regime_summary(table, measure))
 
 def show_performance(chosen):
     """
@@ -167,7 +169,8 @@ def show_performance(chosen):
     stats = performance_stats(chosen,rf)
     if len(chosen) < TRADING_DAYS:
         st.caption("This period is shorter than a year, so annualised figures are extrapolated and can look extreme.")
-    st.info(price_summary(stats))
+    st.markdown("##### What to take away")
+    st.success(price_summary(stats))
 
     # Max drawdown is in "higher is better" because the drawdowns are negtive numbers,
     # so the highest one is actually the smallest fall. This looked wrong to me at the start too.
@@ -192,9 +195,10 @@ def show_performance(chosen):
 
 def render():
     """
-    Draw Panel 1 inside the dashboard.
+    Draw Panel 2 inside the dashboard.
     """
     st.subheader("Performance & ratios")
+    st.caption("By Kien Nguyen | Data: Yahoo Finance daily prices, CBOE VIX, FRED real yields")
 
     prices = load_prices()
 
@@ -264,11 +268,14 @@ def overview():
 
     # Same chart as the full panel, made smaller and without the tool bar
     fig = make_price_chart(rebased)
-    fig.update_layout(height=220,yaxis_title=None,
+    fig.update_layout(height=300,yaxis_title=None,
                       margin=dict(l=0,r=0,t=30,b=0))
     fig.update_yaxes(nticks=3)
     st.plotly_chart(fig, config={"staticPlot" : True},
                     key="p1_overview_chart")
+    end = rebased.iloc[-1]
+    st.caption(f"Growth of 100 since Jan 2025: gold reached {end['Gold']:.0f}, "
+               f"against {end['S&P 500']:.0f} for the S&P 500.")
     
 
 def start_date(prices, period):
