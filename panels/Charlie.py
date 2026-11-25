@@ -714,17 +714,36 @@ def render():
         st.markdown(METHOD_NOTES)
 
 
+@st.fragment(run_every = 0.1)
+def spinning_3d():
+    """
+    The 3D plane for the Boom period, turned a little on each rerun so it slowly rotates on the overview card.
+    """
+    if "cha_angle" not in st.session_state:
+        st.session_state.cha_angle = 0
+    st.session_state.cha_angle = st.session_state.cha_angle + 0.03      # turn a little more on each rerun
+    angle = st.session_state.cha_angle
+
+    fig = make_3d(load_returns(), "Silver", ["Gold", "Copper"], PHASES, "Boom")
+    fig.update_layout(
+        title_text = "",
+        height = 300,
+        margin = dict(l = 0, r = 0, t = 0, b = 0),
+        scene = dict(
+            aspectratio = dict(x = 1, y = 1, z = 0.7),
+            camera = dict(eye = dict(x = 1.3 * np.cos(angle), y = 1.3 * np.sin(angle), z = 0.2),     # camera moves round in a circle
+                          center = dict(x = 0, y = 0, z = -0.25)),
+            xaxis = dict(showticklabels = False),
+            yaxis = dict(showticklabels = False),
+            zaxis = dict(showticklabels = False),
+        ),
+    )
+    st.plotly_chart(fig, config = {"displayModeBar": False}, key = "cha_overview_chart")
+
+
 def overview():
     """
-    Small preview for the overview grid: silver's beta on gold before, during and after the boom.
+    Small preview for the overview grid: the 3D regression plane for silver on gold and copper during the boom, slowly rotating.
     """
-    returns = load_returns()
-    by_period = results_by_period(returns, "Silver", ["Gold"], PHASES, list(PHASES))
-    crash_beta = by_period[by_period["Period"] == "Crash"]["Beta"].iloc[0]
-
-    fig = make_dot_whisker(by_period, ["Gold"], PHASES, 0.95)
-    fig.update_layout(height = 300, xaxis_title = None, margin = dict(l = 10, r = 10, t = 30, b = 0))
-    fig.update_yaxes(showticklabels = False)
-    st.plotly_chart(fig, config = {"staticPlot": True}, key = "cha_overview_chart")
-    st.caption(f"After silver's peak on {SILVER_PEAK:%d %b %Y}, a 1% daily move in gold was associated "
-               f"with about a {crash_beta:.1f}% daily move in silver.")
+    spinning_3d()
+    st.caption("Silver against gold and copper in the boom. The plane is steep along gold and flatter along copper, so silver tracked gold.")
