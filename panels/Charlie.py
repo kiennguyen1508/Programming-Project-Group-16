@@ -715,15 +715,11 @@ def render():
 
 
 @st.fragment(run_every = 0.1)
-def spinning_3d():
+def overview_3d():
     """
-    The 3D plane for the Boom period, turned a little on each rerun so it slowly rotates on the overview card.
+    The 3D plane for the boom at a fixed angle for the overview card. Drag to rotate.
     """
-    if "cha_angle" not in st.session_state:
-        st.session_state.cha_angle = 0
-    st.session_state.cha_angle = st.session_state.cha_angle + 0.03      # turn a little more on each rerun
-    angle = st.session_state.cha_angle
-
+    angle = 0.8
     fig = make_3d(load_returns(), "Silver", ["Gold", "Copper"], PHASES, "Boom")
     fig.update_layout(
         title_text = "",
@@ -738,12 +734,13 @@ def spinning_3d():
             zaxis = dict(showticklabels = False),
         ),
     )
-    st.plotly_chart(fig, config = {"displayModeBar": False}, key = "cha_overview_chart")
+    st.plotly_chart(fig, config = {"displayModeBar": False, "scrollZoom": False}, key = "cha_overview_chart")
 
 
 def overview():
     """
-    Small preview for the overview grid: the 3D regression plane for silver on gold and copper during the boom, slowly rotating.
+    Small preview for the overview grid: the 3D regression plane for silver on gold and copper during the boom.
     """
-    spinning_3d()
-    st.caption("Silver against gold and copper in the boom. The plane is steep along gold and flatter along copper, so silver tracked gold.")
+    overview_3d()
+    st.caption("Drag to rotate. Silver against gold and copper in the boom: the plane is steep along gold and flatter "
+               "along copper, so silver tracked gold.")
