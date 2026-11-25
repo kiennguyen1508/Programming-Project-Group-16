@@ -999,8 +999,11 @@ def overview():
         go.Bar(name="Since 2025", x=frame.index, y=frame["Since-2025 volatility"], marker_color="#E0A82E"),
     ])
     fig.update_layout(
-        barmode="group", height=280, title="Annualised volatility: before vs since 2025",
-        yaxis_title="Volatility (%)", margin=dict(l=5, r=5, t=45, b=5),
-        legend=dict(orientation="h", y=1.12),
+        barmode="group",
+        height=360,
+        title=dict(text="Annualised volatility: before vs since 2025", x=0.02),
+        yaxis_title="Volatility (%)",
+        margin=dict(l=5, r=5, t=55, b=55),
+        legend=dict(orientation="h", y=-0.2, x=0.5, xanchor="center"),
     )
     st.plotly_chart(fig, width="stretch", key="p4_distribution_overview")
