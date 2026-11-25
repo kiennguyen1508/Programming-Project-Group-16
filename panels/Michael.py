@@ -992,6 +992,7 @@ def overview():
                 "Since-2025 volatility": post["Annualised volatility (%)"],
             })
     if not rows:
+        st.caption("Not enough data for the volatility preview.")
         return
     frame = pd.DataFrame(rows).set_index("Asset")
     fig = go.Figure([
