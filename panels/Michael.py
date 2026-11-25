@@ -734,6 +734,7 @@ def format_p_value(value):
 
 def render():
     st.subheader("Distribution & Risk")
+    st.caption("By Michael Gilgunn")
     st.caption(
         "Research question: How has the relationship between daily price changes "
         "and trading activity evolved since 2025, and was the change distinct for Gold?"
@@ -782,11 +783,15 @@ def render():
             key="p4_distribution_bandwidth",
         )
 
-    compare_enabled = st.checkbox(
+    st.session_state.setdefault("p4_compare_enabled", False)
+    if st.button(
         "Compare with a second asset or period",
-        value=False,
-        key="p4_compare_enabled",
-    )
+        key="p4_compare_toggle",
+        type="primary" if st.session_state.p4_compare_enabled else "secondary",
+        use_container_width=True,
+    ):
+        st.session_state.p4_compare_enabled = not st.session_state.p4_compare_enabled
+    compare_enabled = st.session_state.p4_compare_enabled
     distribution_specs = [(selected_asset, selected_period)]
 
     if compare_enabled:
@@ -955,6 +960,11 @@ def render():
         data=export.to_csv().encode("utf-8"),
         file_name="distribution_risk_returns_volume.csv",
         mime="text/csv", key="p4_distribution_download"
+    )
+    st.info(
+        "**Takeaway:** Trading activity and return patterns differ across assets "
+        "and periods, but these comparisons are descriptive and do not show that "
+        "volume causes price movements."
     )
 
 
