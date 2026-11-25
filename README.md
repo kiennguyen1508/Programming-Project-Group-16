@@ -129,18 +129,61 @@ The OLS estimates are calculated by hand with the matrix formula and checked aga
 - Robust standard errors matter here: in the crash, silver's standard error on gold is 0.28 with them and 0.09 without, because volatility after the peak was far from constant.
 
 ###  Panel 2: Performance and ratios (Kien Nguyen)
-**Question:** How has gold performed against the other assets, and does it actually protect investors when markets are stressed?
+**Question:** How has gold performed against the other assets, and does it protect investors when markets are stressed?
 
-**Data:** Gold, silver, Brent oil and the S&P 500 from `prices.csv`, plus the VIX and copper from `macro.csv`.
+**How it answers the main question:** If gold is a safe haven, it should hold up on fear days and fall less than other assets in bad periods. This panel tests that directly and compares the period since 2025 with the full 2015-2026 history.
 
-**What it shows:** The panel has three tabs.
-- **Performance:** how each asset grew over the chosen period, or how far it fell from its previous peak (drawdown). A table compares annual return, volatility, Sharpe ratio and Sortino ratio (both using an assumed 4% yearly risk-free rate) and maximum drawdown, with the best value in each column highlighted.
-- **Stress days:** each asset's daily return on calm days and on stressed days. A day counts as stressed if the VIX closed at or above the chosen level the day before.
-- **Ratios:** the gold/silver, gold/oil and gold/copper ratios, and how often each one moved back towards its average after drifting far from it. The average is a rolling 5-year one, so the test only uses data that was available at the time.
+#### Data handling and transformation
+**1. Data used.** Gold, silver, Brent oil and the S&P 500 come from `prices.csv` through `get_prices()`: 2,972 trading days from 2 Jan 2015 to 30 Oct 2026, with no missing values. Copper and the VIX come from `macro.csv` through `get_macro()`.
 
-**Controls:** period, assets, a start-date slider, a Growth/Drawdown switch and a Replay button that animates the chart. The Stress days tab also has a VIX threshold (25 by default) and a choice between the average and the median.
+**2. Joining copper without losing price days.** Copper is added with a  *left join* on the price dates. An inner join would have deleted gold, silver and oil days whenever copper had no price. With a left join, those days stay in the data and copepr is simply blank, and blank copper days (at most 5) are dropped only when the Gold/Copper ratio is calculated. No missing value is ever filled in, so no prices are invented.
 
-**Key findings:** Gold did not reliably rise after fear spikes. Over the full period it averaged +0.01% a day on the 391 stressed days, compared with +0.05% on calm days, while the S&P 500 averaged +0.13% on stressed days. The gold/silver ratio was the most predictable of the three: when it was more than 2σ away from its rolling 5-year average, it moved back towards that average over the next 3 months 81% of the time, against a base rate of about 43-57%.
+**3. Simple returns instead of log returns.** The other panels use log returns because they add up across days and suit regressions and correlations. This panel uses simple daily returns (`pct_change`) because it reports what an investor actually earned: growth of 100, total return, Sharpe and Sortino. The difference matters on big days: on 30 Jan 2026 silver's simple return was -31.3%, but its log return was -37.6%.
+
+**4. Rebasing to 100.** Gold trades around $4,000 and silver around $80, so their raw prices can't share one chart. Each price is divided by its first falue in the chosen period and multiplied by 100, so every line starts at 100 and shows growth in percentage terms.
+
+**5. Annualising.** Daily figures are converted to yearly ones using 252 trading days: annualised return = (1 + total return)^(1/years) -1, and volatility = daily standard deviation x √252. For periods shorter than a year the panel shows a warning, because annualised figures can look extreme.
+
+**6. Avoiding look-abead bias** Two tests only use information that was available at the time:
+- **Stress days** use the VIX close from the *previous* trading day. Same-day VIX would be circular, because the VIX jumps on the same days stocks fall.
+- **The reversion test** compares each day's ratio with a *rolling* 5-year average and σ, not the full-sample average, and only starts once 2 years of history exist (from about January 2017). Using the full-sample average would mean judging 2018 with knowledge of 2026.
+
+**7. Two different averages for the ratios, on purpose.** The ratio chart's band, z-score and percentile use the full 2015-2026 history, so the "average" doesn't change everytime you click a different period. The reversion test uses the rolling average from point 6, because it simulates what an investor would have known at the time.
+
+**8. Extreme days kept.** Large moves, such as silver's crash on 30 Jan 2026 and the S&P 500's +9.5% on 9 Apr 2025, were checked and kept, because they are exactly the events the panel studies. To stop one day dominating the result, the Stress days tab offers the median as well as the average.
+
+**9. Sample size after each step.** Full period: 2,971 return days, of which 391 are stressed (VIX ≥ 25 the day before) and 2,580 calm. Since 2025: 458 return days, of which only 34 are stressed and 424 calm.
+
+#### What you see
+Three tabs:
+1. **Performance:** a chart (Growth of 100, Drawdown or Replay) and a table of total return, annualised return, volatility, maximum drawdown, Sharpe ratio and Sortino ratio, with the best value in each column highlighted. A text box summarises the table.
+2. **Stress days:** each asset's average (or median) daily return on calm days and on stressed days.
+3. **Ratios:** the gold/silver, gold/oil and gold/copper ratios with their 2015–2026 average and ±1σ/±2σ bands, plus today's value, z-score and percentile. Below this, the reversion test shows how often a ratio moved back towards its average after being more than 2σ away, next to a base rate (how often it moved that way on any day).
+
+#### How to read it
+- **Sharpe and Sortino:** return per unit of risk; higher is better. Sortino only counts days below the risk-free rate as risk.
+- **Drawdown:** how far an asset is below its previous peak; closer to 0% is better.
+- **Stress days:** if gold protects investors, its stressed-day bar should be at or above its calm-day bar and above the S&P 500's.
+- **Reversion test:** the signal only means something if "Moved back towards mean" is clearly higher than the base rate.
+
+#### Controls
+Period (Since 2025, YTD, 1Y, 5Y, Max; default Since 2025), asset picker and a "Start from" slider. Performance tab: chart type (Growth of 100, Drawdown, Replay), log-scale toggle and risk-free rate slider (0–6%, default 4%). Stress days tab: VIX threshold (15–40, default 25) and Average/Median. Ratios tab: ratio picker and look-ahead horizon (1, 3 or 6 months). A CSV download of the prices and a "Method and Limitations" section are at the bottom of the panel.
+
+#### Key findings
+Saved data to 30 Oct 2026; the settings to reproduce each finding are in brackets.
+- **Since 2025, gold earned more but became riskier.** Annualised return 23.2% with 25.1% volatility and a Sharpe ratio of 0.80, the highest of the four assets, against 10.6%, 16.8% and 0.45 over the full period. Silver and oil returned more since 2025 (32.1% and 27.2%) but with far higher volatility (52.8% and 45.1%). *[Performance, Since 2025 vs Max]*
+- **Gold is in its deepest fall since 2015.** It peaked at $5,318 on 29 Jan 2026 and closed at $3,899 on 30 Oct 2026, a 26.7% drawdown. That is deeper than any fall from 2015 to 2024 (the worst was about 21%). *[Performance, Max, Drawdown]*
+- **Gold did not reliably protect investors on fear days.** On the 391 stressed days, gold averaged +0.01% a day against +0.05% on calm days, while the S&P 500 averaged +0.13% on stressed days. The median gives the same ranking. *[Stress days, Max, VIX 25]*
+- **Since 2025 gold did rise on stressed days, but so did everything else.** On the 34 stressed days, gold averaged +0.18% (+0.09% on calm days), but the S&P 500 averaged +0.28% and silver +0.27%. This looks like markets bouncing back after fear spikes, not gold protecting investors, and 34 days is a small sample. *[Stress days, Since 2025, VIX 25]*
+- **Only the gold/silver ratio reliably moved back to its average.** After being more than 2σ from its rolling 5-year average, it moved back within 3 months 81% of the time, against a base rate of 43–57%. Gold/oil (53% vs 47%) and gold/copper (54% vs 45%) were barely better than chance. Today the gold/silver ratio is 79.4, right at its average (z = −0.04, 50th percentile), so there is no signal now. *[Ratios, 3 months]*
+
+#### Limitations
+- The "since 2025" period is under two years and has only 34 stressed days, so those results are much less certain than the full-period ones.
+- The reversion test counts overlapping days (259 above +2σ and 105 below −2σ for gold/silver), so the number of independent episodes is much smaller than the day counts suggest.
+- Ratios can spike far upwards but cannot fall below zero, so the σ bands are only approximate. The percentile is more reliable.
+- The risk-free rate is fixed for the whole period (default 4%), but cash rates were near zero until 2022, so Sharpe and Sortino over Max are only approximate.
+- Futures prices jump slightly when contracts roll over, and the S&P 500 is a price index without dividends, which understates its return.
+- The panel describes the past and is not a forecast.
 
 ###  Panel 3: Correlation Heatmap (Matthew Herbert)
 **Question:** Which assets move together with gold, and did those links change in relation to various economic events?
