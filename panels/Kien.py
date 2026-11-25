@@ -1,10 +1,11 @@
 """
-Panel 1: Performance and ratios (Kien).
+Panel 2: Performance and ratios (Kien).
 """
 import streamlit as st
 import plotly.graph_objects as go
 import pandas as pd
 import numpy as np
+from scipy import stats
 
 from data_loader import get_prices, get_macro, SPLIT
 
@@ -33,13 +34,15 @@ Volatility = standard deviation of daily returns x √252. Max drawdown = the la
 daily return x 252 - risk-free rate) ÷ volatility, using the slider rate (default 4%). It uses the average return, not the compound one, because compounding already lowers the return of volatile assets.
 Sortino ratio = the same numerator ÷ downside deviation, which only counts days when the return fell below the daily risk-free rate.
 
-**Ratios.** The mean and ±1σ/±2σ bands use the full 2015-2026 history, so they stay fixed when the period changes. The percentile is the share of days since 2015 with a lower ratio than today. The reversion test instead uses a rolling 5-year mean and σ(needing at least 2 years of history), so each day is judged only on data available at the time.
+**Ratios.** The mean and ±1σ/±2σ bands use the full 2015-2026 history, so they stay fixed when the period changes. The percentile is the share of days since 2015 with a lower ratio than today. The reversion test instead uses a rolling 5-year mean and σ (needing at least 2 years of history), so each day is judged only on data available at the time.
 
 Copper is COMEX copper futures (HG=F, $ per pound) from the shared macro file. The Gold/Copper ratio compares a safe-haven asset with an industrial one: it tends to rise when markets fear a slowdown and fall when they expect growth.
 
-**Calm vs stressed days.** VIX closes from Cboe, via the shared macro file. A day counts as stressed if the VIX closed at or above the chosen level (default 25) on the previous trading day. Yesterday’s VIX is used because today’s VIX rises because stocks are falling today, which would make the comparison circular. Averages from fewer than about 20 days are unreliable. The chart shows the average or median daily return (you can swithc between them). The median gives a similar ranking and is less affected by a few extreme days.
+**Calm vs stressed days.** VIX closes from Cboe, via the shared macro file. A day counts as stressed if the VIX closed at or above the chosen level (default 25) on the previous trading day. Yesterday’s VIX is used because today’s VIX rises because stocks are falling today, which would make the comparison circular. Averages from fewer than about 20 days are unreliable. The chart shows the average or median daily return (you can switch between them). The median gives a similar ranking and is less affected by a few extreme days.
 
 With few stressed days, one extreme day can dominate the average (e.g. the S&P 500’s +9.5% on 9 April 2025), so compare the average with the median and prefer the Max period for conclusions.
+
+**Significance test.** Welch's t-test (`scipy.stats.ttest_ind` with `equal_var=False`) compares each asset's average daily return on stressed days with its average on calm days. H0: the two averages are equal. A p-value below 0.05 rejects H0 at the 5% level. Welch's version is used because returns are much more volatile on stressed days, so the two groups do not have the same variance. The test assumes each day is independent, but stressed days come in runs (volatility clusters), so the p-values are only approximate.
 
 **Limitations.** Futures prices jump slightly when contracts roll over. The S&P 500 is a price index, so it excludes dividends. The ratios are skewed (they can spike far upwards but 
 not fall below zero), so the σ bands are only approximate; the percentile is more reliable. Past performance does not predict future returns. Consecutive extreme days overlap, so the real number of independent cases is smaller than "Days" suggests.
@@ -83,7 +86,8 @@ def show_ratios(prices, recent):
                 help = "How many standard deviations today's ratio is from its 2015-2026 average")
     c3.metric("Percentile" , f"{stats['percentile']:.0f}%",
                 help = "Share of days since 2015 when the ratio was lower than today")
-    st.info(ratio_summary(name,top,bottom,stats))
+    st.markdown("##### What to take away")
+    st.success(ratio_summary(name,top,bottom,stats))
     st.markdown("**Do extreme readings revert?**")
     horizon = st.select_slider(
         "Look-ahead horizon",
@@ -132,7 +136,18 @@ def show_stress(chosen):
         if min(n_stressed, n_calm) < 20:
             st.warning("One group has fewer than 20 days, so its result is unreliable.")
         st.plotly_chart(make_regime_chart(table, measure))
-        st.info(regime_summary(table, measure))
+        test = stress_test(chosen, load_vix(), threshold)
+        st.markdown("**Is the difference real, or just chance?**")
+        st.dataframe(test.style.format({
+            "Difference (stressed - calm)": "{:+.2%}",
+            "t-stat": "{:+.2f}",
+            "p-value": "{:.3f}",
+        }))
+        st.caption("Welch t-test on average daily returns, stressed vs calm days. "
+                   "A p-value below 0.05 means the gap is unlikely to be chance. "
+                   "The test always compares averages, even when the chart shows medians.")
+        st.markdown("##### What to take away")
+        st.success(regime_summary(table, measure, test))
 
 def show_performance(chosen):
     """
@@ -167,9 +182,10 @@ def show_performance(chosen):
     stats = performance_stats(chosen,rf)
     if len(chosen) < TRADING_DAYS:
         st.caption("This period is shorter than a year, so annualised figures are extrapolated and can look extreme.")
-    st.info(price_summary(stats))
+    st.markdown("##### What to take away")
+    st.success(price_summary(stats))
 
-    # Max drawdown is in "higher is better" because the drawdowns are negtive numbers,
+    # Max drawdown is in "higher is better" because the drawdowns are negative numbers,
     # so the highest one is actually the smallest fall. This looked wrong to me at the start too.
     higher_is_better = ["Total return", "Annualised return", "Max drawdown",
                         "Sharpe ratio", "Sortino ratio"]
@@ -192,9 +208,10 @@ def show_performance(chosen):
 
 def render():
     """
-    Draw Panel 1 inside the dashboard.
+    Draw Panel 2 inside the dashboard.
     """
     st.subheader("Performance & ratios")
+    st.caption("By Kien Nguyen | Data: Yahoo Finance daily prices, Cboe VIX")
 
     prices = load_prices()
 
@@ -242,20 +259,20 @@ def render():
     with tab_ratio:
         show_ratios(prices, recent)
 
-    with st.expander("Method and Limitations"):
+    with st.expander("Method and limitations"):
         st.markdown(METHOD_NOTES)
 
     st.download_button(
         "Download price data (CSV)",
         data = recent.to_csv().encode("utf-8"),
-        file_name= f"panel1_prices_{period.replace(' ', '_').lower()}.csv",
+        file_name= f"panel2_prices_{period.replace(' ', '_').lower()}.csv",
         mime="text/csv",
         key="p1_download"
     )
 
 def overview():
     """
-    Small preview of Panel 1 for the overview grid.
+    Small preview of Panel 2 for the overview grid.
     Growth of 100 for all four assets since 2025, chart only
     """
     prices = load_prices()
@@ -264,11 +281,14 @@ def overview():
 
     # Same chart as the full panel, made smaller and without the tool bar
     fig = make_price_chart(rebased)
-    fig.update_layout(height=220,yaxis_title=None,
+    fig.update_layout(height=300,yaxis_title=None,
                       margin=dict(l=0,r=0,t=30,b=0))
     fig.update_yaxes(nticks=3)
     st.plotly_chart(fig, config={"staticPlot" : True},
                     key="p1_overview_chart")
+    end = rebased.iloc[-1]
+    st.caption(f"Growth of 100 since Jan 2025: gold reached {end['Gold']:.0f}, "
+               f"against {end['S&P 500']:.0f} for the S&P 500.")
     
 
 def start_date(prices, period):
@@ -285,6 +305,34 @@ def start_date(prices, period):
     if period == "5Y":
         return last - pd.DateOffset(years = 5)
     return prices.index[0] #"Max"
+
+
+def stress_test(prices, vix, threshold):
+    """
+    Welch t-test for each asset: is the average daily return on stressed days
+    really different from calm days, or could the gap be chance?
+    """
+    returns = prices.pct_change().dropna()
+    # Same stressed/calm split as regime_returns: yesterday's VIX decides today's group
+    prev_vix = vix.shift(1).reindex(returns.index)
+    valid = prev_vix.notna()
+    returns, prev_vix = returns[valid], prev_vix[valid]
+    stressed = prev_vix >= threshold
+
+    rows = {}
+    for asset in returns.columns:
+        calm_days = returns.loc[~stressed, asset]
+        stress_days = returns.loc[stressed, asset]
+        # equal_var=False is Welch's test: stressed days are much more volatile,
+        # so I don't assume both groups have the same variance
+        t, p = stats.ttest_ind(stress_days, calm_days, equal_var=False)
+        rows[asset] = {
+            "Difference (stressed - calm)": stress_days.mean() - calm_days.mean(),
+            "t-stat": t,
+            "p-value": p,
+            "Significant at 5%?": "Yes" if p < 0.05 else "No",
+        }
+    return pd.DataFrame(rows).T
 
 
 def make_price_chart(rebased, log_scale = False):
@@ -533,7 +581,7 @@ def regime_returns(prices, vix, threshold, measure="mean"):
     """
     returns = prices.pct_change().dropna()
     # I use yesterday's VIX, not today's, because the VIX jumps on the same day stocks fall,
-    # so using today's would bascially be checking whether falling days are falling days, like a circle process
+    # so using today's would basically be checking whether falling days are falling days, like a circle process
     # I shift before reindexing so it's the previous VIX day, not the previous price day.
     prev_vix = vix.shift(1).reindex(returns.index)
     valid = prev_vix.notna()
@@ -564,13 +612,32 @@ def make_regime_chart(table, measure):
     )
     return fig
 
-def regime_summary(table, measure):
+def regime_summary(table, measure, test):
     """
-    One-sentence takeaway from the calm vs stressed comparison.
+    Takeaway from the calm vs stressed comparison, using the t-test to say whether the gaps are real.
     """
     best = table["Stressed days"].idxmax()
     worst = table["Stressed days"].idxmin()
-    return (f"On stressed days, **{best}** had the highest {measure.lower()} return "
-        f"({table.loc[best, 'Stressed days']:+.2%} a day) and **{worst}** the lowest "
-        f"({table.loc[worst, 'Stressed days']:+.2%}).")
+    text = (f"On stressed days, **{best}** had the highest {measure.lower()} return "
+            f"({table.loc[best, 'Stressed days']:+.2%} a day) and **{worst}** the lowest "
+            f"({table.loc[worst, 'Stressed days']:+.2%}).")
+
+    significant = list(test.index[test["Significant at 5%?"] == "Yes"])
+    if significant:
+        text += (f" The gap between stressed and calm days is significant at 5% for "
+                 f"**{', '.join(significant)}**.")
+    else:
+        text += " None of the gaps between stressed and calm days is significant at 5%, so they could be chance."
+
+    # What it means for someone holding gold as protection
+    if "Gold" in test.index:
+        gold = test.loc["Gold"]
+        if gold["Significant at 5%?"] == "Yes" and gold["Difference (stressed - calm)"] > 0:
+            text += " For an investor, gold did significantly better when markets were scared, which is what a safe haven should do."
+        elif gold["Significant at 5%?"] == "Yes":
+            text += " For an investor, gold did significantly worse when markets were scared, so it did not act as a safe haven here."
+        else:
+            text += (" For an investor, gold behaved about the same on scared days as on normal days: "
+                     "no clear sign that it rises in a panic.")
+    return text
     
