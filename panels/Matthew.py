@@ -284,13 +284,16 @@ def result_sentence(a, b, r1, r2, p, cutoff, start) -> str:
     return (f"The {a} x {b} correlation coefficient {direction} from {r1:+.2f} before "
         f"{start:%b %Y} to {r2:+.2f} in this period. {verdict}")
 
-def set_period(name, first, last):
-    """Move the time slider to one of the group's shared periods."""
+def get_periods(first, last):
+    """The start and end dates of each of the group's shared periods."""
     split, peak = pd.Timestamp(SPLIT).date(), SILVER_PEAK.date()
     one_day = pd.Timedelta(days=1)
-    periods = {"Before": (first, split - one_day), "Boom": (split, peak),
-               "Crash": (peak + one_day, last), "2025 Onwards": (split, last)}
-    st.session_state.p3_dates = periods[name]
+    return {"Before": (first, split - one_day), "Boom": (split, peak),
+            "Crash": (peak + one_day, last), "2025 Onwards": (split, last)}
+
+def set_period(name, first, last):
+    """Move the time slider to one of the group's shared periods."""
+    st.session_state.p3_dates = get_periods(first, last)[name]
 
 def show_method():
     """Method and Limitations dropdown, shown under every view."""
@@ -353,9 +356,12 @@ def render():
         if "p3_dates" not in st.session_state:
             st.session_state.p3_dates = (pd.Timestamp(SPLIT).date(), last)
         st.markdown(":small[Quick Period Select]")
-        for col, name in zip(st.columns(4), ["Before", "Boom", "Crash", "2025 Onwards"]):
-                   col.button(name, key=f"p3_btn_{name}", on_click=set_period,
-                   args=(name, first, last), width="stretch")
+        periods = get_periods(first, last)
+        for col, name in zip(st.columns(4), periods):
+            chosen = tuple(st.session_state.p3_dates) == periods[name]
+            col.button(name, key=f"p3_btn_{name}", on_click=set_period,
+                       args=(name, first, last), width="stretch",
+                       type="primary" if chosen else "secondary")
         start, end = st.slider("Time Period", min_value=first, max_value=last,
                            format="MMM YYYY", key="p3_dates")
     for key in ("p3_pair_a", "p3_pair_b"):
