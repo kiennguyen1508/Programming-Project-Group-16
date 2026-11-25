@@ -37,7 +37,7 @@ BETA_NOTES = {"Silver vs Gold": "β is silver's average daily move for each 1% d
                              "in the same direction, a negative β in opposite directions. If the confidence interval "
                              "includes 0, there is no clear link."}
 
-CAVEATS = {"Silver vs Gold": "These are same-day associations. They show how much silver amplified gold's moves, "
+CAVEATS = {"Silver vs Gold": "These are same-day associations. They show how far silver moved with gold, "
                                "not that gold caused them, and they do not forecast future returns.",
            "Silver vs Gold + Copper": "Comparing the two βs suggests whether silver behaved more like a precious or an "
                                         "industrial metal, but it is not a formal test. Copper is also more volatile "
@@ -47,7 +47,7 @@ CAVEATS = {"Silver vs Gold": "These are same-day associations. They show how muc
 
 ONE_FOR_ONE = {"Silver vs Gold": True,
                "Silver vs Gold + Copper": True,
-               "Oil vs Gold": False}          # one-for-one doesnt make sense for oil
+               "Oil vs Gold": False}          # one-for-one doesn't make sense for oil
 
 PERIOD_COLOURS = {"Before": "#7C8798", "Boom": "#B45309", "Crash": "#2563EB",
                   "2015-2024": "#7C8798", "2025": "#B45309", "2026 YTD": "#2563EB"}
@@ -418,9 +418,9 @@ def takeaway(by_period, relationship):
     if relationship == "Silver vs Gold":
         above = (gold["CI low"] > 1).sum()
         if above == len(gold):
-            text = ("Silver acted like a geared version of gold: when gold moved, silver tended to move further in "
-                    "the same direction. For someone holding silver, that means bigger gains when gold rises and "
-                    "bigger losses when it falls.")
+            text = ("Silver was more sensitive to gold's daily moves: when gold moved, silver tended to move further in "
+                    "the same direction. For someone holding silver, that meant bigger gains on days gold rose and "
+                    "bigger losses on days it fell.")
         elif above > 0:
             text = ("In some periods silver moved further than gold, so holding silver was riskier than gold at "
                     "times, but not consistently.")
@@ -716,9 +716,9 @@ def render():
 
 def overview():
     """
-   Small preview for the overview grid: the 3D regression plane for silver on gold and copper during the boom.
+    Small preview for the overview grid: the 3D regression plane for silver on gold and copper during the boom.
     """
-    angle = 0.8                     # fixed viewing angle, chosen to show the plane tilting along gold
+    angle = 0.8         # viewing angle
     fig = make_3d(load_returns(), "Silver", ["Gold", "Copper"], PHASES, "Boom")
     fig.update_layout(
         title_text = "",
