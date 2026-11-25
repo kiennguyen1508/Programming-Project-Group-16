@@ -292,6 +292,42 @@ def set_period(name, first, last):
                "Crash": (peak + one_day, last), "2025 Onwards": (split, last)}
     st.session_state.p3_dates = periods[name]
 
+def show_method():
+    """Method and Limitations dropdown, shown under every view."""
+    with st.expander("Method and Limitations"):
+        st.markdown("""
+        **Data:** Daily closing prices of gold, silver, Brent oil and the S&P 500 from Yahoo Finance
+(`data/prices.csv`), plus Commodities, the Dollar index, Copper, the 10-year real yield
+and the VIX from `data/macro.csv`. Only days where every series has a
+value are kept (2,925 trading days, January 2015 to October 2026).
+
+**Returns:** Gold, silver, oil and the S&P 500 use daily log returns. The other assets use the
+daily percentage change, except the real yield, which uses the daily change in percentage points because
+it is already a rate. Correlating returns rather than prices avoids finding false links between
+assets that simply both trended upwards.
+
+**Correlation and significance:** Each cell is the Pearson correlation (r) between two assets'
+daily returns for the chosen period. A cell is marked "n.s." when its p-value is above the
+significance level picked on the slider (default 0.05), meaning the link could be down to chance.
+
+**Rolling graph:** The correlation is recalculated over a moving window of days (default 90).
+A longer window gives a smoother but slower line. The shaded band is a 95 percent confidence interval
+using the Fisher z-transformation.
+
+**Decoupling analysis.** Compares each pair's correlation in the chosen period with all the days
+before it. A Fisher z-test checks whether the change is bigger than chance would explain. The
+ranking table orders pairs by the size of the change and greys out changes that are not significant.
+
+**Limitations.** Correlation only measures straight-line links and does not show cause and effect.
+Markets close at different times (for example oil and US stocks), which can weaken some daily links.
+Pearson r is sensitive to a few extreme days, such as the COVID crash. The Fisher z-test assumes each
+day is independent, which is not fully true for financial returns, so p-values may be slightly too
+small. Short periods (such as the Crash period, or 2026 in the timeline, which only runs to October)
+give less reliable results, and the rolling graph depends on the window size chosen. With 36 pairs
+tested at once, a few will look significant by chance alone.
+""")
+
+
 def render():
     """Draw Panel 3 on the dashboard"""
     st.subheader("Correlation Heatmap")
@@ -373,6 +409,7 @@ def render():
             st.markdown(f"##### Additional Assets: {pair2[0]} x {pair2[1]}")
             show_rolling_stats(returns, pair2[0], pair2[1], window, start, end)
     if view != "Decoupling Analysis":
+        show_method()
         return
 
     # 3.5 Ranking every pair by how much it changed, using the fisher test.
@@ -418,39 +455,7 @@ def render():
     c3.metric("p-value", "< 0.001" if p < 0.001 else f"{p:.3f}")
     st.info(result_sentence(a, b, r1, r2, p, cutoff, start))
 
-    # 5. Method and Limitations Dropdown box (if needed?, not sure yet but as a test will add.)
-    with st.expander("Method and Limitations"):
-        st.markdown("""
-**Data:** Daily closing prices of gold, silver, Brent oil and the S&P 500 from Yahoo Finance
-(`data/prices.csv`), plus Commodities, the Dollar index, Copper, the 10-year real yield
-and the VIX from `data/macro.csv`. Only days where every series has a
-value are kept (2,925 trading days, January 2015 to October 2026).
-
-**Returns:** Gold, silver, oil and the S&P 500 use daily log returns. The other assets use the
-daily percentage change, except the real yield, which uses the daily change in percentage points because
-it is already a rate. Correlating returns rather than prices avoids finding false links between
-assets that simply both trended upwards.
-
-**Correlation and significance:** Each cell is the Pearson correlation (r) between two assets'
-daily returns for the chosen period. A cell is marked "n.s." when its p-value is above the
-significance level picked on the slider (default 0.05), meaning the link could be down to chance.
-
-**Rolling graph:** The correlation is recalculated over a moving window of days (default 90).
-A longer window gives a smoother but slower line. The shaded band is a 95 percent confidence interval
-using the Fisher z-transformation.
-
-**Decoupling analysis.** Compares each pair's correlation in the chosen period with all the days
-before it. A Fisher z-test checks whether the change is bigger than chance would explain. The
-ranking table orders pairs by the size of the change and greys out changes that are not significant.
-
-**Limitations.** Correlation only measures straight-line links and does not show cause and effect.
-Markets close at different times (for example oil and US stocks), which can weaken some daily links.
-Pearson r is sensitive to a few extreme days, such as the COVID crash. The Fisher z-test assumes each
-day is independent, which is not fully true for financial returns, so p-values may be slightly too
-small. Short periods (such as the Crash period, or 2026 in the timeline, which only runs to October)
-give less reliable results, and the rolling graph depends on the window size chosen. With 36 pairs
-tested at once, a few will look significant by chance alone.
-""")
+    
 
 
 def overview():
