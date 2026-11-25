@@ -1,5 +1,5 @@
 """
-Panel 1: Performance and ratios (Kien).
+Panel 2: Performance and ratios (Kien).
 """
 import streamlit as st
 import plotly.graph_objects as go
@@ -33,11 +33,11 @@ Volatility = standard deviation of daily returns x √252. Max drawdown = the la
 daily return x 252 - risk-free rate) ÷ volatility, using the slider rate (default 4%). It uses the average return, not the compound one, because compounding already lowers the return of volatile assets.
 Sortino ratio = the same numerator ÷ downside deviation, which only counts days when the return fell below the daily risk-free rate.
 
-**Ratios.** The mean and ±1σ/±2σ bands use the full 2015-2026 history, so they stay fixed when the period changes. The percentile is the share of days since 2015 with a lower ratio than today. The reversion test instead uses a rolling 5-year mean and σ(needing at least 2 years of history), so each day is judged only on data available at the time.
+**Ratios.** The mean and ±1σ/±2σ bands use the full 2015-2026 history, so they stay fixed when the period changes. The percentile is the share of days since 2015 with a lower ratio than today. The reversion test instead uses a rolling 5-year mean and σ (needing at least 2 years of history), so each day is judged only on data available at the time.
 
 Copper is COMEX copper futures (HG=F, $ per pound) from the shared macro file. The Gold/Copper ratio compares a safe-haven asset with an industrial one: it tends to rise when markets fear a slowdown and fall when they expect growth.
 
-**Calm vs stressed days.** VIX closes from Cboe, via the shared macro file. A day counts as stressed if the VIX closed at or above the chosen level (default 25) on the previous trading day. Yesterday’s VIX is used because today’s VIX rises because stocks are falling today, which would make the comparison circular. Averages from fewer than about 20 days are unreliable. The chart shows the average or median daily return (you can swithc between them). The median gives a similar ranking and is less affected by a few extreme days.
+**Calm vs stressed days.** VIX closes from Cboe, via the shared macro file. A day counts as stressed if the VIX closed at or above the chosen level (default 25) on the previous trading day. Yesterday’s VIX is used because today’s VIX rises because stocks are falling today, which would make the comparison circular. Averages from fewer than about 20 days are unreliable. The chart shows the average or median daily return (you can switch between them). The median gives a similar ranking and is less affected by a few extreme days.
 
 With few stressed days, one extreme day can dominate the average (e.g. the S&P 500’s +9.5% on 9 April 2025), so compare the average with the median and prefer the Max period for conclusions.
 
@@ -172,7 +172,7 @@ def show_performance(chosen):
     st.markdown("##### What to take away")
     st.success(price_summary(stats))
 
-    # Max drawdown is in "higher is better" because the drawdowns are negtive numbers,
+    # Max drawdown is in "higher is better" because the drawdowns are negative numbers,
     # so the highest one is actually the smallest fall. This looked wrong to me at the start too.
     higher_is_better = ["Total return", "Annualised return", "Max drawdown",
                         "Sharpe ratio", "Sortino ratio"]
@@ -198,7 +198,7 @@ def render():
     Draw Panel 2 inside the dashboard.
     """
     st.subheader("Performance & ratios")
-    st.caption("By Kien Nguyen | Data: Yahoo Finance daily prices, CBOE VIX, FRED real yields")
+    st.caption("By Kien Nguyen | Data: Yahoo Finance daily prices, Cboe VIX")
 
     prices = load_prices()
 
@@ -246,13 +246,13 @@ def render():
     with tab_ratio:
         show_ratios(prices, recent)
 
-    with st.expander("Method and Limitations"):
+    with st.expander("Method and limitations"):
         st.markdown(METHOD_NOTES)
 
     st.download_button(
         "Download price data (CSV)",
         data = recent.to_csv().encode("utf-8"),
-        file_name= f"panel1_prices_{period.replace(' ', '_').lower()}.csv",
+        file_name= f"panel2_prices_{period.replace(' ', '_').lower()}.csv",
         mime="text/csv",
         key="p1_download"
     )
@@ -540,7 +540,7 @@ def regime_returns(prices, vix, threshold, measure="mean"):
     """
     returns = prices.pct_change().dropna()
     # I use yesterday's VIX, not today's, because the VIX jumps on the same day stocks fall,
-    # so using today's would bascially be checking whether falling days are falling days, like a circle process
+    # so using today's would basically be checking whether falling days are falling days, like a circle process
     # I shift before reindexing so it's the previous VIX day, not the previous price day.
     prev_vix = vix.shift(1).reindex(returns.index)
     valid = prev_vix.notna()
