@@ -36,6 +36,18 @@ Using `python -m` runs the Streamlit installation in the active virtual environm
 
 Price and macro data are stored in `data/`. The Distribution & Risk panel also uses raw trading-volume history from Yahoo Finance. Run the app while online to populate its local cache; later runs can use the cache offline when it covers the requested dates.
 
+**5. What the Dashboard Should Look like.**
+
+## Main Dashboard
+
+## Panel 1: Regression Analysis
+
+## Panel 2: Performance and Ratios
+
+## Panel 3: Correlation Heatmap
+
+## Panel 4: Distribution and Risk
+
 ## Using the dashboard
 
 The dashboard opens on an overview page with a preview of all four panels. Select **Open →** to view a panel and its controls, then **← Back to overview** to return. Each panel includes a **Method and Limitations** section describing its calculations and caveats.
