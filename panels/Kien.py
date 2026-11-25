@@ -5,6 +5,7 @@ import streamlit as st
 import plotly.graph_objects as go
 import pandas as pd
 import numpy as np
+from scipy import stats
 
 from data_loader import get_prices, get_macro, SPLIT
 
@@ -40,6 +41,8 @@ Copper is COMEX copper futures (HG=F, $ per pound) from the shared macro file. T
 **Calm vs stressed days.** VIX closes from Cboe, via the shared macro file. A day counts as stressed if the VIX closed at or above the chosen level (default 25) on the previous trading day. Yesterday’s VIX is used because today’s VIX rises because stocks are falling today, which would make the comparison circular. Averages from fewer than about 20 days are unreliable. The chart shows the average or median daily return (you can switch between them). The median gives a similar ranking and is less affected by a few extreme days.
 
 With few stressed days, one extreme day can dominate the average (e.g. the S&P 500’s +9.5% on 9 April 2025), so compare the average with the median and prefer the Max period for conclusions.
+
+**Significance test.** Welch's t-test (`scipy.stats.ttest_ind` with `equal_var=False`) compares each asset's average daily return on stressed days with its average on calm days. H0: the two averages are equal. A p-value below 0.05 rejects H0 at the 5% level. Welch's version is used because returns are much more volatile on stressed days, so the two groups do not have the same variance. The test assumes each day is independent, but stressed days come in runs (volatility clusters), so the p-values are only approximate.
 
 **Limitations.** Futures prices jump slightly when contracts roll over. The S&P 500 is a price index, so it excludes dividends. The ratios are skewed (they can spike far upwards but 
 not fall below zero), so the σ bands are only approximate; the percentile is more reliable. Past performance does not predict future returns. Consecutive extreme days overlap, so the real number of independent cases is smaller than "Days" suggests.
@@ -133,8 +136,18 @@ def show_stress(chosen):
         if min(n_stressed, n_calm) < 20:
             st.warning("One group has fewer than 20 days, so its result is unreliable.")
         st.plotly_chart(make_regime_chart(table, measure))
+        test = stress_test(chosen, load_vix(), threshold)
+        st.markdown("**Is the difference real, or just chance?**")
+        st.dataframe(test.style.format({
+            "Difference (stressed - calm)": "{:+.2%}",
+            "t-stat": "{:+.2f}",
+            "p-value": "{:.3f}",
+        }))
+        st.caption("Welch t-test on average daily returns, stressed vs calm days. "
+                   "A p-value below 0.05 means the gap is unlikely to be chance. "
+                   "The test always compares averages, even when the chart shows medians.")
         st.markdown("##### What to take away")
-        st.success(regime_summary(table, measure))
+        st.success(regime_summary(table, measure, test))
 
 def show_performance(chosen):
     """
@@ -292,6 +305,34 @@ def start_date(prices, period):
     if period == "5Y":
         return last - pd.DateOffset(years = 5)
     return prices.index[0] #"Max"
+
+
+def stress_test(prices, vix, threshold):
+    """
+    Welch t-test for each asset: is the average daily return on stressed days
+    really different from calm days, or could the gap be chance?
+    """
+    returns = prices.pct_change().dropna()
+    # Same stressed/calm split as regime_returns: yesterday's VIX decides today's group
+    prev_vix = vix.shift(1).reindex(returns.index)
+    valid = prev_vix.notna()
+    returns, prev_vix = returns[valid], prev_vix[valid]
+    stressed = prev_vix >= threshold
+
+    rows = {}
+    for asset in returns.columns:
+        calm_days = returns.loc[~stressed, asset]
+        stress_days = returns.loc[stressed, asset]
+        # equal_var=False is Welch's test: stressed days are much more volatile,
+        # so I don't assume both groups have the same variance
+        t, p = stats.ttest_ind(stress_days, calm_days, equal_var=False)
+        rows[asset] = {
+            "Difference (stressed - calm)": stress_days.mean() - calm_days.mean(),
+            "t-stat": t,
+            "p-value": p,
+            "Significant at 5%?": "Yes" if p < 0.05 else "No",
+        }
+    return pd.DataFrame(rows).T
 
 
 def make_price_chart(rebased, log_scale = False):
@@ -571,13 +612,32 @@ def make_regime_chart(table, measure):
     )
     return fig
 
-def regime_summary(table, measure):
+def regime_summary(table, measure, test):
     """
-    One-sentence takeaway from the calm vs stressed comparison.
+    Takeaway from the calm vs stressed comparison, using the t-test to say whether the gaps are real.
     """
     best = table["Stressed days"].idxmax()
     worst = table["Stressed days"].idxmin()
-    return (f"On stressed days, **{best}** had the highest {measure.lower()} return "
-        f"({table.loc[best, 'Stressed days']:+.2%} a day) and **{worst}** the lowest "
-        f"({table.loc[worst, 'Stressed days']:+.2%}).")
+    text = (f"On stressed days, **{best}** had the highest {measure.lower()} return "
+            f"({table.loc[best, 'Stressed days']:+.2%} a day) and **{worst}** the lowest "
+            f"({table.loc[worst, 'Stressed days']:+.2%}).")
+
+    significant = list(test.index[test["Significant at 5%?"] == "Yes"])
+    if significant:
+        text += (f" The gap between stressed and calm days is significant at 5% for "
+                 f"**{', '.join(significant)}**.")
+    else:
+        text += " None of the gaps between stressed and calm days is significant at 5%, so they could be chance."
+
+    # What it means for someone holding gold as protection
+    if "Gold" in test.index:
+        gold = test.loc["Gold"]
+        if gold["Significant at 5%?"] == "Yes" and gold["Difference (stressed - calm)"] > 0:
+            text += " For an investor, gold did significantly better when markets were scared, which is what a safe haven should do."
+        elif gold["Significant at 5%?"] == "Yes":
+            text += " For an investor, gold did significantly worse when markets were scared, so it did not act as a safe haven here."
+        else:
+            text += (" For an investor, gold behaved about the same on scared days as on normal days: "
+                     "no clear sign that it rises in a panic.")
+    return text
     
