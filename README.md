@@ -36,21 +36,11 @@ Using `python -m` runs the Streamlit installation in the active virtual environm
 
 Price and macro data are stored in `data/`. The Distribution & Risk panel also uses raw trading-volume history from Yahoo Finance. Run the app while online to populate its local cache; later runs can use the cache offline when it covers the requested dates.
 
-**5. What the Dashboard Should Look like.**
-
-## Main Dashboard
-
-## Panel 1: Regression Analysis
-
-## Panel 2: Performance and Ratios
-
-## Panel 3: Correlation Heatmap
-
-## Panel 4: Distribution and Risk
-
 ## Using the dashboard
 
 The dashboard opens on an overview page with a preview of all four panels. Select **Open →** to view a panel and its controls, then **← Back to overview** to return. Each panel includes a **Method and Limitations** section describing its calculations and caveats.
+
+![Overview page with a preview of all four panels](assets/overview.png)
 
 ## Data
 
@@ -132,6 +122,8 @@ Each panel has its own "Method and Limitations" section in the app with the deta
 
 The OLS estimates are calculated by hand with the matrix formula and checked against statsmodels in `charlie_regression.ipynb`. Each relationship has a scatter with fitted lines, a dot and whisker chart of each β with its confidence interval, and, for the copper regression, a rotatable 3D plane. Under the chart, a blue box answers the question in plain words, followed by the full results table (downloadable as a CSV). "What the results mean" explains each β, tests whether β changed significantly between periods (a z-test) and ends with a practical takeaway.
 
+![Panel 1: silver's β on gold before, during and after the boom, with confidence intervals](assets/panel1_regression.png)
+
 **Controls:** Relationship, period scheme (boom/crash or calendar years), selected periods, chart type, confidence level (90%, 95% or 99%) and a toggle for White robust standard errors.
 
 **Key findings:**
@@ -180,6 +172,8 @@ Three tabs, each ending with a green "What to take away" box that states the res
 - **Stress days:** if gold protects investors, its stressed-day bar should be at or above its calm-day bar and above the S&P 500's.
 - **p-value:** below 0.05 means the gap between stressed and calm days is unlikely to be chance. Above 0.05, the bars may look different but the gap could be noise.
 - **Reversion test:** the signal only means something if "Moved back towards mean" is clearly higher than the base rate.
+
+![Panel 2, Stress days tab: calm vs stressed returns, Welch t-test and takeaway (Max, VIX 25)](assets/panel2_stress_days.png)
 
 #### Controls
 Period (Since 2025, YTD, 1Y, 5Y, Max; default Since 2025), asset picker and a "Start from" slider. Performance tab: chart type (Growth of 100, Drawdown, Replay), log-scale toggle and risk-free rate slider (0–6%, default 4%). Stress days tab: VIX threshold (15–40, default 25) and Average/Median. Ratios tab: ratio picker and look-ahead horizon (1, 3 or 6 months). A CSV download of the prices and a "Method and limitations" section are at the bottom of the panel.
@@ -236,6 +230,8 @@ The Animated Timeline groups the data by calendar year, with about 245 to 249 da
 - ***Animated Timeline:*** One heatmap per year from 2015 to 2026, played with a Play button or a year slider, to show how the links shift year by year. 2026 covers January to October only.
 - ***Decoupling Analysis:*** Compares the selected period with all the days before it. A table ranks every pair by how much its correlation changed, with a Fisher z-test p-value for each change, and can be downloaded as a CSV. It can also be shown as a heatmap of the changes. The "Pair in Focus" section then tests one chosen pair and says in plain words whether the change is real or just random noise.
 
+![Panel 3: correlation heatmap since January 2025, with non-significant pairs marked n.s.](assets/panel3_heatmap.png)
+
 **Controls:** An assets picker; Quick Period Select buttons (Before, Boom, Crash, 2025 Onwards); a time period slider; and a significance level slider (0.01 to 0.20, default 0.05). The Rolling Graph has its own "Comparing" and "Against" dropdowns and a smoothing window slider (30 to 250 days, default 90). Controls that do nothing on a view are hidden on that view.
 **Key findings and interpretations:**
 - Over the whole period, gold's strongest link is with silver (r = 0.77). Gold moves against the dollar (r = -0.38) and against real yields (r = -0.30), and has almost no link with the S&P 500, oil or the VIX.
@@ -287,6 +283,8 @@ Volume data is cached locally in `data/volume_history.csv`, so it does not need 
 - **Trading Activity and Return Magnitude:** Observations are divided into low- and high-volume terciles within 2015–2024 and since 2025. The panel compares mean absolute daily log returns between the two groups, calculates the high-minus-low difference and examines how this relationship changed after 2024. Gold's change is also compared against the average change across the available comparison assets.
 
 - **Distribution and Variance Tests:** Kolmogorov–Smirnov tests compare the pre-2025 and post-2024 return distributions, while Levene tests examine whether their variances differ. The results include the post/pre volatility ratio, sample sizes and Holm-adjusted p-values to account for multiple hypothesis testing.
+
+![Panel 4: 3D joint distribution and contour plot of gold's daily returns and trading-volume percentile, 2015–2024](assets/panel4_distribution.png)
 
 **Controls:** Asset and period selection, with the option to add a second asset or period for distribution comparisons. The KDE bandwidth can be adjusted from 0.65× to 1.4× to control the smoothing of the estimated density surface. The panel also displays the volume source used for each asset. A CSV download provides the selected assets' daily log returns and corresponding volume percentiles.
 
