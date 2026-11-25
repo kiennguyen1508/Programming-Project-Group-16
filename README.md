@@ -198,6 +198,7 @@ Gold, Silver, Oil and the S&P 500 use daily log returns. The other assets use th
 2,900 complete trading days from Jan 2015, to October 2026, which my panel uses.
 
 **Data Preprocessing:**
+
 **1. Loading the data.** The panel uses two saved files, so it runs without internet:
 - `data/prices.csv` (2,972 trading days, 2 Jan 2015 to 30 Oct 2026): Gold, Silver, Brent Oil and the S&P 500. It is read through the shared `get_returns()` function in `data_loader.py`.
 - `data/macro.csv` (2,980 days over the same dates): Commodities (DBC), the Dollar index, Copper, the 10-year real yield and the VIX. It is read directly by the panel's own `load_macro()` function, with the Date column parsed as the index.
