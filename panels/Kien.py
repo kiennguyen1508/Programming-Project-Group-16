@@ -259,7 +259,7 @@ def render():
 
 def overview():
     """
-    Small preview of Panel 1 for the overview grid.
+    Small preview of Panel 2 for the overview grid.
     Growth of 100 for all four assets since 2025, chart only
     """
     prices = load_prices()
