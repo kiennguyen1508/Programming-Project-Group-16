@@ -714,12 +714,11 @@ def render():
         st.markdown(METHOD_NOTES)
 
 
-@st.fragment(run_every = 0.1)
-def overview_3d():
+def overview():
     """
-    The 3D plane for the boom at a fixed angle for the overview card. Drag to rotate.
+   Small preview for the overview grid: the 3D regression plane for silver on gold and copper during the boom.
     """
-    angle = 0.8
+    angle = 0.8                     # fixed viewing angle, chosen to show the plane tilting along gold
     fig = make_3d(load_returns(), "Silver", ["Gold", "Copper"], PHASES, "Boom")
     fig.update_layout(
         title_text = "",
@@ -727,7 +726,7 @@ def overview_3d():
         margin = dict(l = 0, r = 0, t = 0, b = 0),
         scene = dict(
             aspectratio = dict(x = 1, y = 1, z = 0.7),
-            camera = dict(eye = dict(x = 1.3 * np.cos(angle), y = 1.3 * np.sin(angle), z = 0.2),     # camera moves round in a circle
+            camera = dict(eye = dict(x = 1.3 * np.cos(angle), y = 1.3 * np.sin(angle), z = 0.2),
                           center = dict(x = 0, y = 0, z = -0.25)),
             xaxis = dict(showticklabels = False),
             yaxis = dict(showticklabels = False),
@@ -735,12 +734,5 @@ def overview_3d():
         ),
     )
     st.plotly_chart(fig, config = {"displayModeBar": False, "scrollZoom": False}, key = "cha_overview_chart")
-
-
-def overview():
-    """
-    Small preview for the overview grid: the 3D regression plane for silver on gold and copper during the boom.
-    """
-    overview_3d()
     st.caption("Drag to rotate. Silver against gold and copper in the boom: the plane is steep along gold and flatter "
                "along copper, so silver tracked gold.")
