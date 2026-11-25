@@ -732,6 +732,10 @@ def format_p_value(value):
     return f"{value:.3f}"
 
 
+def toggle_comparison():
+    st.session_state.p4_compare_enabled = not st.session_state.p4_compare_enabled
+
+
 def render():
     st.subheader("Distribution & Risk")
     st.caption("By Michael Gilgunn")
@@ -784,13 +788,13 @@ def render():
         )
 
     st.session_state.setdefault("p4_compare_enabled", False)
-    if st.button(
+    st.button(
         "Compare with a second asset or period",
         key="p4_compare_toggle",
         type="primary" if st.session_state.p4_compare_enabled else "secondary",
         use_container_width=True,
-    ):
-        st.session_state.p4_compare_enabled = not st.session_state.p4_compare_enabled
+        on_click=toggle_comparison,
+    )
     compare_enabled = st.session_state.p4_compare_enabled
     distribution_specs = [(selected_asset, selected_period)]
 
