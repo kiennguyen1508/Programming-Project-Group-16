@@ -969,8 +969,8 @@ def overview():
     rows = []
     for asset in [a for a in ASSET_ORDER if a in returns.columns]:
         series = returns[asset]
-        pre = risk_statistics(period_slice(series.to_frame(), "2015–2024")[asset])
-        post = risk_statistics(period_slice(series.to_frame(), "Since 2025")[asset])
+        pre = risk_statistics(period_slice(series, "2015–2024"))
+        post = risk_statistics(period_slice(series, "Since 2025"))
         if pre and post:
             rows.append({
                 "Asset": asset,
