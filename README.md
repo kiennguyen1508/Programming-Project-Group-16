@@ -235,13 +235,17 @@ Gold, Silver, Oil and the S&P 500 use daily log returns. Commodity, dollar and V
 **1. Loading the data.** The panel uses two saved files, so it runs without internet:
 - `data/prices.csv` (2,972 trading days, 2 Jan 2015 to 30 Oct 2026): Gold, Silver, Brent Oil and the S&P 500. It is read through the shared `get_returns()` function in `data_loader.py`.
 - `data/macro.csv` (2,980 days over the same dates): Commodities (DBC), the Dollar index, Copper, the 10-year real yield and the VIX. It is read directly by the panel's own `load_macro()` function, with the Date column parsed as the index.
+
 **2. Turning prices into returns.** Correlating price levels can show misleading links between assets that both trend over time, so each series is converted to a daily change:
 - Gold, Silver, Oil and the S&P 500 use daily log returns, ln(Pₜ / Pₜ₋₁). Other panels may use different return definitions for their analyses.
 - Commodities, the Dollar, Copper and the VIX use the daily % change (`pct_change()`).
 - The real yield is already a rate, so a % change of a yield near zero would give huge, meaningless numbers. It uses the daily change in percentage points instead (`diff()`).
 The first day of each series is omitted because calculating a change requires a previous observation.
+
 **3. Matching the dates.** The two tables are combined with an inner join, keeping only dates present in both files (2,971 days). The markets use different calendars, and `macro.csv` has gaps: 25 missing real-yield values, 5 for Copper and Commodities, 4 for the Dollar and 1 for the VIX. A missing value can also leave the following daily change blank.
+
 **4. Removing incomplete days.** `dropna()` removes any date with a blank in any column, leaving **2,925 complete trading days** (46 removed, about 1.5%) in the saved dataset. Every correlation therefore uses the same dates, making pairs easier to compare. No values are filled in or estimated.
+
 **5. Splitting by period.** The shared `SPLIT` date (1 Jan 2025) and the silver peak (26 Jan 2026) divide the data for the quick period buttons:
 - Before: 2,475 days (Jan 2015 to Dec 2024)
 - Boom: 259 days (1 Jan 2025 to 26 Jan 2026)
