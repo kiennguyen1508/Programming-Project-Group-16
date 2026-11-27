@@ -34,7 +34,7 @@ python -m streamlit run app.py
 ```
 Using `python -m` runs the Streamlit installation in the active virtual environment. The dashboard opens at [http://localhost:8501](http://localhost:8501). If that port is busy, Streamlit selects another port and prints its address in the terminal.
 
-Price and macro data are stored in `data/`. The Distribution & Risk panel also uses raw trading-volume history from Yahoo Finance. Run the app while online to populate its local cache; later runs can use the cache offline when it covers the requested dates.
+All the data the dashboard needs is already saved in `data/`, including the trading-volume history used by the Distribution & Risk panel, so the dashboard runs without an internet connection.
 
 ## Using the dashboard
 
@@ -51,23 +51,24 @@ All data is daily, from 2 January 2015 to 30 October 2026. It comes from Yahoo F
 | `data/prices.csv` | Closing prices of gold futures (`GC=F`), silver futures (`SI=F`), Brent crude futures (`BZ=F`) and the S&P 500 (`^GSPC`). Only days when all four traded are kept. | Yahoo Finance |
 | `data/macro.csv` | US dollar index (`DX-Y.NYB`), copper futures (`HG=F`), a broad commodity ETF (`DBC`), the 10-year real yield (`DFII10`) and the VIX. Kept separate from the prices so that adding it did not change any panel's existing results. | Yahoo Finance, FRED, Cboe |
 | `data/VIX_History.csv` | Daily VIX history, used to build the VIX column in `macro.csv`. | Cboe |
-| `data/volume_history.csv` | Cached daily raw trading volumes used to calculate trailing, within-instrument percentiles. Created the first time the Distribution & Risk panel loads while online. | Yahoo Finance |
+| `data/volume_history.csv` | Daily raw trading volumes for each asset, used by the Distribution & Risk panel to calculate trailing volume percentiles. Included in the repository; the panel only downloads new volume data if this file does not cover the dates it needs. | Yahoo Finance |
 | `data/volume_history_sources.json` | Labels identifying the futures volume series or ETF proxy used for each asset. | Yahoo Finance |
 
 ### Refreshing the data
 
-This is optional and needs an internet connection. It overwrites the CSV files with the latest data.
+This is optional, needs an internet connection, and is **not needed to run the dashboard**. It overwrites the saved CSV files.
 
 ```bash
 python data_loader.py           # re-downloads prices.csv
 python data_loader.py macro     # re-downloads macro.csv
 ```
 
-The risk panel refreshes its volume cache when saved history does not cover the analysis periods or a source is unavailable. To force a refresh for the same dates, remove `data/volume_history.csv` and `data/volume_history_sources.json`, then restart the app while online. The older `volume_percentiles` cache files, if present, contain full-sample ranks and are no longer used. To run the project on another computer without internet, copy the new volume cache files along with the repository's existing `data/` files.
+Before refreshing, note three things:
+- **The end date is fixed.** `END = "2026-11-01"` in `data_loader.py` stops every download at 31 October 2026. To get newer data, change that date first.
+- **The VIX is not downloaded automatically.** `macro.csv` takes the VIX from the saved `data/VIX_History.csv`. To update it, download the latest VIX history CSV from Cboe's website and save it over that file before running `python data_loader.py macro`.
+- **The results will change.** Every number in the Key findings sections comes from the saved data up to 30 October 2026, so refreshed data will give different figures.
 
-### Using the data in a panel
-
-`data_loader.py` provides shared price, return and macro-data functions. Panels may apply different return definitions or additional date and missing-data filters to suit their analyses.
+The Distribution & Risk panel downloads new volume data by itself only if `data/volume_history.csv` does not cover the dates it needs. To force a fresh download, delete `data/volume_history.csv` and `data/volume_history_sources.json`, then restart the app while online.
 
 | Function | What it returns |
 |---|---|
@@ -321,7 +322,7 @@ These comparisons are descriptive and do not establish a causal relationship bet
 ## Limitations
 - Gold, silver, oil and copper are future prices, which jump slightly when contracts roll over.
 - The S&P 500 is a price index, so it does not include dividends.
-- The saved data stops on 30 October 2026. Run the refresh commands above to update it.
+- The saved data stops on 30 October 2026. See "Refreshing the data" for how to update it and how that affects the results.
 - The "since 2025" period is less than two years long, so its results are less reliable than the 2015–2024 ones.
 - The dashboard shows how gold moves with other markets, not what causes those moves.
-- This project was built for a university module and is not investment advice.
+- This project was built for a university module and is not investment advice. 
