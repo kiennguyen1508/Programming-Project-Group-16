@@ -32,6 +32,8 @@ pip install -r requirements.txt
 ```bash
 python -m streamlit run app.py
 ```
+**Run every command from inside the project folder** (the one containing `app.py`). Starting the app from a different folder stops it from finding the data files.
+
 Using `python -m` runs the Streamlit installation in the active virtual environment. The dashboard opens at [http://localhost:8501](http://localhost:8501). If that port is busy, Streamlit selects another port and prints its address in the terminal.
 
 All the data the dashboard needs is already saved in `data/`, including the trading-volume history used by the Distribution & Risk panel, so the dashboard runs without an internet connection.
@@ -53,6 +55,9 @@ All data is daily, from 2 January 2015 to 30 October 2026. It comes from Yahoo F
 | `data/VIX_History.csv` | Daily VIX history, used to build the VIX column in `macro.csv`. | Cboe |
 | `data/volume_history.csv` | Daily raw trading volumes for each asset, used by the Distribution & Risk panel to calculate trailing volume percentiles. Included in the repository; the panel only downloads new volume data if this file does not cover the dates it needs. | Yahoo Finance |
 | `data/volume_history_sources.json` | Labels identifying the futures volume series or ETF proxy used for each asset. | Yahoo Finance |
+| `data/DFII10.csv` | A saved copy of the 10-year real yield. Not read by any code: `data_loader.py` downloads the real yield directly from FRED. Kept for reference. | FRED |
+| `data/GVZCLS.csv`, `data/SKEW.csv` | Gold volatility index and Cboe SKEW index, downloaded while exploring extra drivers. Not used by any panel. | FRED, Cboe |
+| `data/volume_percentiles.csv`, `data/volume_percentiles_sources.json` | An older version of Panel 4's volume data that ranked volume against the full sample (which would use future information). Replaced by `volume_history.csv` and no longer used. | Yahoo Finance |
 
 ### Refreshing the data
 
@@ -69,6 +74,17 @@ Before refreshing, note three things:
 - **The results will change.** Every number in the Key findings sections comes from the saved data up to 30 October 2026, so refreshed data will give different figures.
 
 The Distribution & Risk panel downloads new volume data by itself only if `data/volume_history.csv` does not cover the dates it needs. To force a fresh download, delete `data/volume_history.csv` and `data/volume_history_sources.json`, then restart the app while online.
+
+### Running the regression notebook (optional choice from user)
+
+`charlie_regression.ipynb` checks Panel 1's hand-calculated regressions against `statsmodels`. It is not needed for the dashboard and needs two extra packages:
+```bash
+pip install statsmodels jupyter
+jupyter notebook charlie_regression.ipynb
+```
+
+### Using the data in a panel
+`data_loader.py` provides shared price, return and macro-data functions. Panels may apply different return definitions or additional date and missing-data filters to suit their analyses.
 
 | Function | What it returns |
 |---|---|
@@ -254,6 +270,9 @@ The Animated Timeline groups the data by calendar year, with about 245 to 249 da
 - `data/macro.csv`: Copper price data, accessed through `get_macro()` and `get_macro_changes()`.
 - Yahoo Finance: Daily trading-volume data. Futures volume is used where sufficient historical coverage is available; otherwise, an ETF proxy is used: GLD (Gold), SLV (Silver), CPER (Copper), USO (Oil) or SPY (S&P 500).
 - `data/volume_history_sources.json`: Records which volume source is used for each asset.
+| `data/DFII10.csv` | A saved copy of the 10-year real yield. Not read by any code: `data_loader.py` downloads the real yield directly from FRED. Kept for reference. | FRED |
+| `data/GVZCLS.csv`, `data/SKEW.csv` | Gold volatility index and Cboe SKEW index, downloaded while exploring extra drivers. Not used by any panel. | FRED, Cboe |
+| `data/volume_percentiles.csv`, `data/volume_percentiles_sources.json` | An older version of Panel 4's volume data that ranked volume against the full sample (which would use future information). Replaced by `volume_history.csv` and no longer used. | Yahoo Finance |
 
 Volume data is cached locally in `data/volume_history.csv`, so it does not need to be downloaded again on every run. Raw trading volume is converted into a trailing 252-observation percentile for each instrument. Each percentile uses only observations available up to that date, avoiding look-ahead bias. A percentile of 90 means trading activity was higher than approximately 90% of the instrument's previous observations. This allows activity to be compared across markets with very different trading volumes.
 
