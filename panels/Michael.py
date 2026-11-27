@@ -492,6 +492,43 @@ def risk_table(returns, assets, periods):
     return pd.DataFrame(rows)
 
 
+def bootstrap_volume_gap_ci(aligned, replicates=5000, seed=2025):
+    """Bootstrap the high-minus-low absolute-return gap."""
+    if aligned.empty or aligned["volume"].nunique() < 3:
+        return None
+    low_cut, high_cut = aligned["volume"].quantile([1 / 3, 2 / 3])
+    low = aligned.loc[aligned["volume"] <= low_cut, "return"].abs().to_numpy() * 100
+    high = aligned.loc[aligned["volume"] >= high_cut, "return"].abs().to_numpy() * 100
+    if len(low) < 30 or len(high) < 30:
+        return None
+    rng = np.random.default_rng(seed)
+    estimates = np.array([
+        rng.choice(high, len(high), replace=True).mean()
+        - rng.choice(low, len(low), replace=True).mean()
+        for _ in range(replicates)
+    ])
+    gap = float(high.mean() - low.mean())
+    lower, upper = np.quantile(estimates, [0.025, 0.975])
+    return gap, float(lower), float(upper)
+
+
+def bootstrap_expected_shortfall_ci(series, replicates=5000, seed=2025):
+    """Bootstrap a 95% Expected Shortfall interval for a return series."""
+    r = clean_series(series)
+    if len(r) < 10:
+        return None
+    rng = np.random.default_rng(seed)
+    estimates = []
+    observations = r.to_numpy(dtype=float)
+    for _ in range(replicates):
+        sample = rng.choice(observations, len(observations), replace=True)
+        threshold = np.quantile(sample, 0.05)
+        estimates.append(-sample[sample <= threshold].mean() * 100)
+    es = float(-r[r <= r.quantile(0.05)].mean() * 100)
+    lower, upper = np.quantile(estimates, [0.025, 0.975])
+    return es, float(lower), float(upper)
+
+
 def activity_relationship_table(returns, volumes, assets):
     """Compare absolute returns in low- and high-volume terciles by period."""
     rows = []
@@ -723,6 +760,42 @@ def var_breach_table(returns, assets):
     return pd.DataFrame(rows)
 
 
+def alternative_var_backtests(returns, asset="Gold"):
+    """Compare static, 252-day rolling and EWMA 95% VaR breach rates."""
+    before = clean_series(period_slice(returns, "2015–2024")[asset])
+    after = clean_series(period_slice(returns, "Since 2025")[asset])
+    combined = pd.concat([before, after]).sort_index()
+
+    rolling_breaches = []
+    rolling_thresholds = []
+    for date, value in after.items():
+        history = combined.loc[:date].iloc[:-1].tail(252)
+        if len(history) < 100:
+            continue
+        threshold = history.quantile(0.05)
+        rolling_thresholds.append(-threshold * 100)
+        rolling_breaches.append(value <= threshold)
+
+    ewma_variance = float(before.var(ddof=1))
+    ewma_breaches = []
+    ewma_thresholds = []
+    for value in after:
+        threshold = 1.645 * np.sqrt(ewma_variance)
+        ewma_thresholds.append(threshold * 100)
+        ewma_breaches.append(value <= -threshold)
+        ewma_variance = 0.94 * ewma_variance + 0.06 * value * value
+
+    return {
+        "Rolling 252-day mean threshold (%)": float(np.mean(rolling_thresholds)),
+        "Rolling 252-day breach rate (%)": float(np.mean(rolling_breaches) * 100),
+        "Rolling 252-day breach days": int(np.sum(rolling_breaches)),
+        "EWMA mean threshold (%)": float(np.mean(ewma_thresholds)),
+        "EWMA breach rate (%)": float(np.mean(ewma_breaches) * 100),
+        "EWMA breach days": int(np.sum(ewma_breaches)),
+        "Observations": len(after),
+    }
+
+
 def format_p_value(value):
     """Keep very small p-values from appearing as zero in the results tables."""
     if pd.isna(value):
@@ -875,6 +948,21 @@ def render():
         ]
         table[numeric] = table[numeric].round(3)
         st.dataframe(table, hide_index=True, width="stretch")
+        if "Gold" in table["Asset"].values:
+            gold_post = table[
+                (table["Asset"] == "Gold")
+                & (table["Period"] == "Since 2025")
+            ]
+            if not gold_post.empty:
+                gold_es = bootstrap_expected_shortfall_ci(
+                    period_slice(returns, "Since 2025")["Gold"]
+                )
+                if gold_es:
+                    st.caption(
+                        "Gold since-2025 95% ES: "
+                        f"{gold_es[0]:.3f}% (bootstrap 95% CI "
+                        f"{gold_es[1]:.3f}% to {gold_es[2]:.3f}%)."
+                    )
     else:
         st.info("Not enough observations for the selected risk statistics.")
     st.caption("VaR and Expected Shortfall are daily losses; volatility is annualised. Small-sample tail estimates are less stable.")
@@ -886,6 +974,17 @@ def render():
         for column in ("Kupiec p-value", "Christoffersen p-value"):
             breaches_display[column] = breaches[column].map(format_p_value)
         st.dataframe(breaches_display, hide_index=True, width="stretch")
+        alternatives = alternative_var_backtests(returns, "Gold")
+        st.caption(
+            "Gold alternative VaR: "
+            f"252-day rolling threshold {alternatives['Rolling 252-day mean threshold (%)']:.3f}% "
+            f"with {alternatives['Rolling 252-day breach days']}/{alternatives['Observations']} breaches "
+            f"({alternatives['Rolling 252-day breach rate (%)']:.2f}%); "
+            "EWMA (λ=0.94, normal 95% VaR) "
+            f"mean threshold {alternatives['EWMA mean threshold (%)']:.3f}% "
+            f"with {alternatives['EWMA breach days']}/{alternatives['Observations']} breaches "
+            f"({alternatives['EWMA breach rate (%)']:.2f}%)."
+        )
     else:
         st.info("Insufficient pre-2025 or post-2024 history to backtest 95% VaR.")
     st.caption(
@@ -924,6 +1023,23 @@ def render():
         ]
         activity_display[numeric] = activity_display[numeric].round(3)
         st.dataframe(activity_display, hide_index=True, width="stretch")
+        gold_period_cis = []
+        for period in ("2015–2024", "Since 2025"):
+            aligned = pd.concat(
+                [
+                    period_slice(returns[["Gold"]], period)["Gold"].rename("return"),
+                    period_slice(volumes[["Gold"]], period)["Gold"].rename("volume"),
+                ],
+                axis=1,
+            ).dropna()
+            interval = bootstrap_volume_gap_ci(aligned)
+            if interval:
+                gold_period_cis.append(
+                    f"{period} {interval[0]:.3f}% "
+                    f"(bootstrap 95% CI {interval[1]:.3f}% to {interval[2]:.3f}%)"
+                )
+        if gold_period_cis:
+            st.caption("Gold high-low gap: " + "; ".join(gold_period_cis) + ".")
         if gold_peer_change is not None:
             st.metric(
                 "Gold minus peer-average change (pp)",

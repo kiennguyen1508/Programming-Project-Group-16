@@ -273,71 +273,103 @@ The Animated Timeline groups the data by calendar year, with about 245 to 249 da
 
 **Limitations:** Correlation only measures straight-line links and says nothing about cause. Daily closing times differ across markets, which can weaken some links. Rolling correlations depend on the window chosen, and the boom and crash periods are short, so their estimates are less certain.
 
+
 ### Panel 4: Distribution & Risk (Michael Gilgunn)
 
-**Question:** How has the relationship between daily price movements and trading activity evolved since 2025, and how does this compare across different assets?
+**Question:** How bad is a bad day for gold, and how has its daily risk changed since 2025?
 
-**Data:** The panel uses daily price, return and trading-volume data from the project's shared data files and Yahoo Finance.
+**Link to the main question:** While the other panels examine gold's performance and relationships with other markets, this panel focuses on the distribution and risk of its daily returns. It investigates how frequently large movements occur, whether downside risk has changed since 2025, and whether unusually high trading activity is associated with larger price movements. It complements the S&P 500 and real-yield findings elsewhere in the dashboard, but it does not currently calculate joint gold–S&P tail dependence or test real yields directly.
 
-- `data/prices.csv`: Daily closing prices for Gold, Silver, Oil and the S&P 500, loaded through `get_returns()` in `data_loader.py`.
-- `data/macro.csv`: Copper price data, accessed through `get_macro()` and `get_macro_changes()`.
-- Yahoo Finance: Daily trading-volume data. Futures volume is used where sufficient historical coverage is available; otherwise, an ETF proxy is used: GLD (Gold), SLV (Silver), CPER (Copper), USO (Oil) or SPY (S&P 500).
-- `data/volume_history_sources.json`: Records which volume source is used for each asset.
+**Data:** The panel combines daily returns, price information and trading-volume data from the project's shared datasets and Yahoo Finance.
 
+- `data/prices.csv`: Daily closing prices for Gold, Silver, Oil and the S&P 500.
+- `data/macro.csv`: Copper price data, accessed through the shared data-loading functions.
+- `data/volume_history.csv`: Cached daily trading-volume observations.
+- `data/volume_history_sources.json`: Identifies the volume source used for each asset.
 
 Volume data is cached locally in `data/volume_history.csv`, so it does not need to be downloaded again on every run. Raw trading volume is converted into a trailing 252-observation percentile for each instrument. Each percentile uses only observations available up to that date, avoiding look-ahead bias. A percentile of 90 means trading activity was higher than approximately 90% of the instrument's previous observations. This allows activity to be compared across markets with very different trading volumes.
 
-**Data preprocessing:**
+Futures volume is used for Gold (GC=F), Silver (SI=F), Oil (BZ=F) and Copper (HG=F), while SPY is used as an ETF proxy for the S&P 500. Volume is converted into a trailing 252-observation percentile for each instrument. This measures current activity relative to its own recent history, rather than comparing raw volumes across markets with very different trading levels. Only information available up to each observation is used, avoiding look-ahead bias.
 
+**Data handling and transformation:**
 
-**1. Loading the data.** The panel loads daily log returns for Gold, Silver, Oil and the S&P 500 through `get_returns()`. Copper returns are obtained through `get_macro()` and `get_macro_changes()`. Trading-volume histories are retrieved from Yahoo Finance where necessary and saved locally for future use.
+1. **Loading returns:** Daily log returns are obtained through `get_returns()` in `data_loader.py`. Copper returns are retrieved through `get_macro()` and `get_macro_changes()`.
+2. **Volume preparation:** Raw trading volume is converted into a trailing 252-observation percentile separately for each instrument. This standardises activity on a scale from 0 to 100.
+3. **Combining the datasets:** Returns and volume percentiles are matched by date so that each observation represents the same trading day.
+4. **Cleaning:** Incomplete observations are removed using `.dropna()` separately for each asset. Missing volume values are not estimated, so aligned sample sizes differ between assets.
+5. **Period selection:** The shared split date (`2025-01-01`) separates 2015–2024 from the period since 2025. Individual calendar years can also be selected, including 2026 YTD.
+6. **Sample sizes:** The number of observations remaining after cleaning is retained for the statistical comparisons, as different assets and periods do not necessarily have identical sample sizes.
 
-**2. Preparing trading volume.** Raw volume is converted into a trailing 252-observation percentile separately for each instrument. This standardises trading activity relative to its own historical levels rather than comparing absolute volumes across different markets.
+**What you see:**
 
-**3. Aligning the data.** The volume percentiles are matched to the corresponding daily returns by date. This ensures that each observation represents the return and trading activity for the same trading day.
+The panel is organised around several complementary views of market risk:
 
-**4. Handling volume sources.** Futures volume is used where sufficient historical coverage exists. Otherwise, a related ETF is used as a proxy. The source for each asset is recorded in `volume_history_sources.json` so that the user can identify which volume series is being analysed.
+- **Joint Probability Distribution:** An interactive 3D surface uses Gaussian Kernel Density Estimation (KDE) to estimate the joint distribution of daily log returns and trading-volume percentiles. Returns are displayed on the X-axis, volume percentile on the Y-axis and estimated probability density on the Z-axis. This makes it possible to examine which combinations of returns and trading activity occur most frequently.
 
-**5. Splitting into periods.** The shared split date (`2025-01-01`) separates the pre-2025 and post-2024 observations. The panel also allows analysis of individual calendar years, including 2026 YTD.
+- **Distribution Comparison:** Users can compare two assets or periods through side-by-side 3D density surfaces and 2D contour plots. Shared density and colour scales make differences in the distributions easier to identify. Reflected observations—copies mirrored at the 0 and 100 percentile boundaries—reduce the artificial loss of density near those boundaries.
 
-**What it shows:**
+- **Risk Measures:** A summary table reports observation count, mean daily return, annualised volatility, 95% Value at Risk (VaR), 95% Expected Shortfall (ES), skewness, excess kurtosis and maximum drawdown. This provides a broader assessment of risk than volatility alone. Annualised volatility is calculated using daily standard deviation multiplied by √252. VaR measures the fifth-percentile daily loss, while ES measures the average loss among observations at or below that threshold. Any row labelled 2026 YTD is a partial-year result, not a full-year estimate.
 
-- **Joint Probability Distribution:** A two-dimensional Gaussian Kernel Density Estimation (KDE) creates an interactive 3D surface. The X-axis represents daily log returns in percentage terms, the Y-axis represents the trailing volume percentile (0–100), and the Z-axis represents estimated joint probability density. Higher areas indicate combinations of returns and trading activity that occur more frequently in the selected sample.
+- **Historical VaR Backtest:** A historical 95% VaR threshold estimated from 2015–2024 is held fixed and tested against returns since 2025. The results show the number and percentage of losses that exceed the threshold. Kupiec's test assesses whether the breach rate is consistent with the expected 5%, while Christoffersen's test examines whether breaches occur independently over time.
 
-- **Distribution Comparison:** Users can compare two different assets or periods using side-by-side 3D density surfaces and 2D contour plots. Both surfaces share a density-axis scale, while the contour plots share a colour scale, making differences in distribution shape and concentration easier to identify. Reflected KDE observations reduce estimation bias near the volume-percentile boundaries of 0 and 100.
+- **Rolling Volatility:** A time-series chart tracks annualised volatility using selectable 21, 30, 60 or 90 trading-day windows. A marker at the beginning of 2025 makes it easier to identify changes in volatility between the two periods.
 
-- **Risk Measures:** A table reports observation count, mean daily return, annualised volatility, 95% Value at Risk (VaR), 95% Expected Shortfall, skewness, excess kurtosis and maximum drawdown. Annualised volatility is calculated using daily standard deviation multiplied by √252. VaR represents the fifth-percentile daily loss, while Expected Shortfall measures the average loss among observations at or below that threshold.
+- **Trading Activity and Return Magnitude:** Observations are separated into low- and high-volume terciles within each period. The panel compares mean absolute daily log returns between these groups and calculates the high-minus-low difference. This helps establish whether larger market movements tend to coincide with unusually high trading activity, and whether that relationship has changed since 2025.
 
-- **Historical VaR Backtest:** The fifth-percentile loss threshold from 2015–2024 is held fixed and tested against returns since 2025. The table reports the number and percentage of breaches against the expected 5% rate. Kupiec's test examines whether the breach rate matches the expected rate, while Christoffersen's test examines whether breaches are independent over time.
+- **Distribution and Variance Tests:** Kolmogorov–Smirnov tests compare the shape of the return distributions before and since 2025, while Levene tests examine differences in variance. The results also report the post/pre volatility ratio, sample sizes and Holm-adjusted p-values to account for multiple comparisons.
 
-- **Rolling Volatility:** A time-series chart displays annualised rolling volatility using a selectable window of 21, 30, 60 or 90 trading days. A vertical marker identifies the beginning of 2025, allowing changes in volatility to be compared across the two periods.
+**Controls:** Users can select an asset and period, or introduce a second asset or period for direct distribution comparisons. The KDE bandwidth can be adjusted from 0.65× to 1.4×, allowing the user to control the smoothness of the estimated density surface. Other controls allow different rolling-volatility windows and VaR confidence levels to be examined. The panel also identifies the volume source used and provides a CSV download of the selected daily returns and corresponding volume percentiles.
 
-- **Trading Activity and Return Magnitude:** Observations are divided into low- and high-volume terciles within 2015–2024 and since 2025. The panel compares mean absolute daily log returns between the two groups, calculates the high-minus-low difference and examines how this relationship changed after 2024. Gold's change is also compared against the average change across the available comparison assets.
+![Panel 4 dashboard showing the joint distribution, risk measures, historical VaR backtest and rolling volatility](assets/panel4_dashboard.png)
 
-- **Distribution and Variance Tests:** Kolmogorov–Smirnov tests compare the pre-2025 and post-2024 return distributions, while Levene tests examine whether their variances differ. The results include the post/pre volatility ratio, sample sizes and Holm-adjusted p-values to account for multiple hypothesis testing.
+**How to interpret the results:**
 
-![Panel 4: 3D joint distribution and contour plot of gold's daily returns and trading-volume percentile, 2015–2024](assets/panel4_distribution.png)
+- A wider distribution along the return axis indicates greater variation in daily price movements.
+- A distribution with a longer negative tail indicates more extreme downside observations.
+- A higher Expected Shortfall indicates more severe average losses in the worst 5% of observations.
+- A positive high-minus-low difference means absolute daily returns were larger during high-volume observations.
+- A higher post/pre volatility ratio indicates that daily volatility increased since 2025.
+- A VaR breach occurs when a daily loss exceeds the historical threshold. A breach rate above 5% suggests the earlier threshold may be understating subsequent losses.
 
-**Controls:** Asset and period selection, with the option to add a second asset or period for distribution comparisons. The KDE bandwidth can be adjusted from 0.65× to 1.4× to control the smoothing of the estimated density surface. The panel also displays the volume source used for each asset. A CSV download provides the selected assets' daily log returns and corresponding volume percentiles.
+These results describe historical relationships and do not establish that trading activity causes larger price movements.
 
-**Interpreting the results:**
+**What to take away:** Gold's downside and volatility estimates rise materially after 2024, but the volume finding may mostly reflect the wider return distribution, and the raw-return KS tests are also sensitive to that volatility change. The joint density and tail measures are descriptive; they are not evidence of causation or prediction.
 
-- A wider distribution along the return axis indicates greater dispersion in daily price movements.
-- Greater concentration towards negative returns indicates a higher concentration of downside observations.
-- A positive high-minus-low difference indicates larger absolute daily returns during high-volume observations.
-- A positive Gold-versus-peer change indicates that Gold's high-minus-low difference increased more, or decreased less, than the average across the comparison assets.
+**Key findings:**
 
-These comparisons are descriptive and do not establish a causal relationship between trading activity and price movements.
+- **Aligned sample sizes:** The risk table uses return observations only: 2,512 / 459 for Gold, Silver and Oil, 2,508 / 458 for Copper and 2,512 / 459 for the S&P 500. After matching returns with trading-volume percentiles and removing incomplete observations, the 2015–2024 / since-2025 aligned samples are 2,483 / 453 for Gold, 2,333 / 448 for Silver, 2,507 / 453 for Copper, 2,510 / 453 for Oil and 2,512 / 459 for the S&P 500.
+- **Changes in Gold's risk:** Gold's annualised volatility increased from 14.81% in 2015–2024 to 25.25% since 2025 (+10.45 percentage points). Its 95% VaR rose from 1.54% to 2.66% (+1.12 percentage points), and 95% Expected Shortfall rose from 2.18% to 3.91% (+1.73 percentage points). For the since-2025 period, a bootstrap 95% interval for Gold's Expected Shortfall is 3.09–4.83%.
+- **Extreme losses:** Gold's worst daily log return increased in magnitude from -5.11% on 9 November 2020 to -11.41% on 30 January 2026. The corresponding worst losses were Silver -12.39% to -37.61%, Copper -6.93% to -25.17%, Oil -27.98% to -15.69%, and the S&P 500 -12.77% to -6.16%. These figures are log returns, so large falls may be less negative as simple percentage returns. Copper moved from 5.570 to 4.3305 on 31 July 2025, with no missing-date gap in `macro.csv`; the simple fall is -22.25% and the log fall is -25.17%. It remains possible that a futures roll or other contract artefact contributes, but the move is not explained by a missing copper observation.
+- **Trading activity:** Gold's mean absolute daily log return in low-volume observations was 0.50% in 2015–2024 and 0.85% since 2025, while in high-volume observations it was 0.88% and 1.60%. The high-minus-low gap rose from 0.38 to 0.74 percentage points. Bootstrap 95% intervals are 0.312–0.440 percentage points for 2015–2024 and 0.496–1.010 percentage points since 2025. The intervals overlap, and mean absolute returns roughly doubled in both groups, while the high/low ratio remained similar (about 1.76 to 1.88), so this descriptive result appears to reflect increased volatility as much as a changed volume-return relationship.
+- **Statistical evidence:** The median-centred Levene tests indicate substantially higher post-2025 volatility for Gold (ratio 1.71), Silver (1.92) and Copper (1.55), with Holm-adjusted p-values below 0.001. The corresponding variance ratios are approximately 2.91, 3.67 and 2.41. The Kolmogorov–Smirnov tests also reject equality for Gold, Silver and Copper, but these raw-return tests partly reflect the volatility increase rather than a separate change in distribution shape or tails. Oil's variance change is significant only in the Levene test (Holm p = 0.017), while the S&P 500 has no significant change (KS Holm p = 0.429; Levene Holm p = 0.241). P-values assume more independence than financial returns usually provide.
+
+| Asset | Post/pre volatility ratio | KS statistic | KS Holm p | Levene statistic | Levene Holm p |
+|---|---:|---:|---:|---:|---:|
+| Gold | 1.71 | 0.134 | 6.03×10^-6 | 147 | 1.96×10^-32 |
+| Silver | 1.92 | 0.148 | 3.51×10^-7 | 136 | 3.35×10^-30 |
+| Copper | 1.55 | 0.0889 | 0.0123 | 28.7 | 2.70×10^-7 |
+| Oil | 1.12 | 0.0587 | 0.263 | 6.92 | 0.0171 |
+| S&P 500 | 0.910 | 0.0439 | 0.429 | 1.38 | 0.241 |
+
+- **Historical VaR backtest:** Gold's historical 95% VaR threshold from 2015–2024 was 1.54%. Since 2025, it was breached on 47 of 459 return observations (10.24%). Kupiec's coverage test rejects the 5% breach-rate benchmark (LR = 20.6, p = 5.56×10^-6). The separate Christoffersen independence test does not indicate clustered breaches (LR = 0.142, p = 0.706), but only 47 breaches provide limited power. For comparison, a 252-day rolling historical VaR produced 30 breaches (6.54%) and an EWMA model (λ = 0.94) produced 26 breaches (5.66%). The lower breach rates show that static VaR failure is partly a regime-shift effect, although neither alternative eliminates the stress-period breaches. The 95% level is used consistently with the rest of this panel, while 99% VaR and wider tail estimates would produce fewer observations and more uncertainty.
 
 **Limitations:**
 
-- ETF volume is used as a proxy where sufficient futures-volume history is unavailable. It does not represent the exact trading volume of the futures contract or index being analysed.
+- SPY volume is used as a proxy for the S&P 500, rather than the exact trading volume of the index.
 - Continuous futures contracts can experience volume disruptions around contract rollovers.
-- Early volume percentiles use fewer than 252 observations, making initial estimates less representative of a full historical window.
-- Tail-risk estimates are less stable when based on small samples; observation counts are provided in the risk table.
-- The 2026 sample is incomplete and should not be treated as a full-year result.
-- Tail estimates from small samples are less stable. The Kolmogorov–Smirnov, Levene, Kupiec and Christoffersen tests rely on assumptions that may not fully hold for financial returns, particularly where volatility clustering is present. Their results should therefore be treated as indicative rather than definitive.
-- Historical distributions and backtesting results describe past market behaviour and cannot predict future performance.
+- Early volume percentiles use fewer than 252 observations, making initial estimates less representative of a full historical window; these observations are not separately flagged in the joint-density view.
+- The volume percentile is constructed separately for each asset and is roughly uniform across the full sample, so the 3D surface primarily visualises the return distribution and should not be interpreted as evidence of dependence.
+- The Gaussian KDE uses one bandwidth and can oversmooth heavy-tailed return distributions, particularly near the extreme tails.
+- Low- and high-volume terciles are re-cut within each period. Thus, cross-period comparisons combine a change in returns with a change in the period-specific volume threshold.
+- Missing volume observations are dropped rather than estimated. Across the full 2,971 return dates, Silver has 2,781 aligned observations (about 190 fewer), while Gold has 2,936 (about 35 fewer). Any clustering of missing Silver volume should be checked for year or market-regime bias.
+- Tail-risk estimates are less stable when based on smaller samples. The 95% Expected Shortfall since 2025 rests on about 23 tail observations and has no confidence interval in the current panel.
+- The 2026 YTD figures in the dashboard and any 2026-labelled tables are partial-year estimates and should not be treated as full-year results.
+- The Panel 2 since-2025 return count differs from Panel 4; this cross-panel mismatch should be reconciled by the relevant panel owner before exact sample counts are compared.
+- Statistical tests rely on assumptions that may not fully hold for financial returns, particularly where volatility clustering is present. Their results should therefore be treated with some caution.
+- The volume-gap and Expected Shortfall bootstrap intervals use fixed-seed IID resampling and do not model serial dependence or volatility clustering.
+- Oil's 2020 extreme move should be checked against Brent contract and exchange-calendar conventions; the saved Brent-observation fall was -24.40% simple around 20–21 April 2020. Copper's 31 July 2025 fall is not a missing-date gap, but futures-roll effects cannot be excluded from the macro-series-only check.
+- Historical distributions and backtesting describe previous market behaviour and cannot predict future performance.
+
 
 
 ## Contributions
