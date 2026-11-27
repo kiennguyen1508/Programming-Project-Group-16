@@ -532,6 +532,10 @@ def bootstrap_expected_shortfall_ci(series, replicates=5000, seed=2025):
 def activity_relationship_table(returns, volumes, assets):
     """Compare absolute returns in low- and high-volume terciles by period."""
     rows = []
+    period_data = {
+        period: (period_slice(returns, period), period_slice(volumes, period))
+        for period in ("2015–2024", "Since 2025")
+    }
     for asset in assets:
         if asset not in returns or asset not in volumes:
             continue
@@ -539,10 +543,11 @@ def activity_relationship_table(returns, volumes, assets):
         row = {"Asset": asset}
         period_gaps = {}
         for period, suffix in (("2015–2024", "2015–2024"), ("Since 2025", "Since 2025")):
+            period_returns, period_volumes = period_data[period]
             aligned = pd.concat(
                 [
-                    period_slice(returns[[asset]], period)[asset].rename("return"),
-                    period_slice(volumes[[asset]], period)[asset].rename("volume"),
+                    period_returns[asset].rename("return"),
+                    period_volumes[asset].rename("volume"),
                 ],
                 axis=1,
             ).dropna()
