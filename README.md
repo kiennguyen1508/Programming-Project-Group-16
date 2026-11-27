@@ -5,12 +5,13 @@
 This interactive dashboard looks at gold alongside silver, oil, the S&P 500 and several economic factors (the US dollar, copper, a broad commodity index, the 10-year real yield and the VIX), using daily data from 2 January 2015 to 30 October 2026. Each of the four panels answers one part of the main question, and each compares the years before 2025 with the period since.
 
 ## What we found
-In this data, gold moved mostly closely with silver and against the US dollar and real yields, and since 2025 its behaviour clearly changed:
+In this data, gold moved most closely with silver and against the US dollar and real yields, and since 2025 its behaviour clearly changed:
 - **The textbook drivers weakened.** Gold's negative link with real yields almost disappeared after 2025 (r = −0.36 before, −0.10 since; Panel 3), so higher real yields no longer held gold back during the boom.
 - **Gold became a higher-return, higher-risk asset.** Since 2025 it returned 23.2% a year with 25.1% volatility, against 10.6% and 16.8% over the full period, and it is now in its deepest fall since 2015 (−26.7% from its January 2026 peak; Panel 2).
 - **It did not act as a reliable safe haven.** Gold's returns on high-fear days were not significantly different from normal days (Panel 2), and in the 2026 crash it moved *with* the S&P 500 (r = 0.36) rather than against it (Panel 3).
 - **Silver amplified gold throughout.** Silver moved more than one-for-one with gold in every period (β 1.51 before 2025, 1.93 in the crash) and tracked gold far more than copper, so it behaved as a precious metal rather than an industrial one (Panel 1).
-<!-- Panel 4: Wait for Gilgunn's key finding-->
+- **Gold's bad days got worse.** Its average loss on the worst 5% of days rose from 2.18% before 2025 to 3.91% since, and a 95% risk limit based on 2015–2024 data was broken on 10.2% of days instead of the expected 5% (Panel 4).
+
 These are links in past data, not proof of what causes gold's moves. Each panel's section below explains how its result was calculated and its limitations.
 
 ## Quick start
@@ -182,7 +183,7 @@ The OLS estimates are calculated by hand with the matrix formula and checked aga
 
 **8. Extreme days retained.** Large moves, including silver's decline on 30 January 2026 and the S&P 500's +9.5% move on 9 April 2025, were checked and retained because they are relevant to the analysis. The Stress days tab offers the median as well as the average so a single extreme day has less influence on the summary.
 
-**9. Sample size after each step.** Full period: 2,971 return days, of which 391 are stressed (VIX ≥ 25 the day before) and 2,580 calm. Since 2025: 458 return days, of which only 34 are stressed and 424 calm.
+**9. Sample size after each step.** Full period: 2,971 return days, of which 391 are stressed (VIX ≥ 25 the day before) and 2,580 calm. Since 2025: 458 return days, of which only 34 are stressed and 424 calm. "Since 2025" starts from the first close of 2025 (2 January), so the first return counted is 3 January; Panel 4 calculates returns over the full history before splitting, so it counts 459 days.
 
 **10. Testing whether the stress-day gap is real.** Each asset's stressed-day returns are compared with its calm-day returns using Welch's t-test (`scipy.stats.ttest_ind` with `equal_var=False`). Welch's version is used instead of the standard t-test because returns are much more volatile on stressed days, so the two groups do not have the same variance.
 
@@ -227,7 +228,6 @@ Saved data to 30 Oct 2026; the settings to reproduce each finding are in bracket
 **Data:** The panel draws on files in the `data/` folder:
 - `data/prices.csv`: Daily closing prices for Gold, Silver, Oil and the S&P 500 from Yahoo Finance, loaded through `get_returns()` in `data_loader.py`.
 - `data/macro.csv`: Daily levels for commodities, the US dollar and Copper, plus the 10-year real yield and VIX. The panel loads this file with its `load_macro()` function.
-- `data/DFII10.csv`: This file supplies the real yield column figures in `macro.csv`.
 - `data/VIX_History.csv`: Supplies the VIX values used in `macro.csv`.
 
 Gold, Silver, Oil and the S&P 500 use daily log returns. Commodity, dollar and VIX series use daily percentage changes; the real yield uses the daily change in percentage points. Dates with incomplete data are excluded from the panel's complete-case analysis.
@@ -240,6 +240,7 @@ Gold, Silver, Oil and the S&P 500 use daily log returns. Commodity, dollar and V
 - Gold, Silver, Oil and the S&P 500 use daily log returns, ln(Pₜ / Pₜ₋₁). Other panels may use different return definitions for their analyses.
 - Commodities, the Dollar, Copper and the VIX use the daily % change (`pct_change()`).
 - The real yield is already a rate, so a % change of a yield near zero would give huge, meaningless numbers. It uses the daily change in percentage points instead (`diff()`).
+
 The first day of each series is omitted because calculating a change requires a previous observation.
 
 **3. Matching the dates.** The two tables are combined with an inner join, keeping only dates present in both files (2,971 days). The markets use different calendars, and `macro.csv` has gaps: 25 missing real-yield values, 5 for Copper and Commodities, 4 for the Dollar and 1 for the VIX. A missing value can also leave the following daily change blank.
@@ -250,6 +251,7 @@ The first day of each series is omitted because calculating a change requires a 
 - Before: 2,475 days (Jan 2015 to Dec 2024)
 - Boom: 259 days (1 Jan 2025 to 26 Jan 2026)
 - Crash: 191 days (27 Jan 2026 to Oct 2026)
+
 The Animated Timeline groups the data by calendar year, with about 245 to 249 days per year, except 2025 (243) and 2026 (207, January to October only).
 
 **6. Preparing for the statistics.** Correlations are clipped to between -0.999 and +0.999 before the Fisher z-transform (arctanh), since a correlation of exactly ±1 would give an infinite value. The rolling correlation needs a full window before it starts, so the first 29 to 249 days (depending on the window chosen) have no value and are dropped from the graph.
@@ -318,7 +320,7 @@ The panel is organised around several complementary views of market risk:
 
 - **Distribution and Variance Tests:** Kolmogorov–Smirnov tests compare the shape of the return distributions before and since 2025, while Levene tests examine differences in variance. The results also report the post/pre volatility ratio, sample sizes and Holm-adjusted p-values to account for multiple comparisons.
 
-**Controls:** Users can select an asset and period, or introduce a second asset or period for direct distribution comparisons. The KDE bandwidth can be adjusted from 0.65× to 1.4×, allowing the user to control the smoothness of the estimated density surface. Other controls allow different rolling-volatility windows and VaR confidence levels to be examined. The panel also identifies the volume source used and provides a CSV download of the selected daily returns and corresponding volume percentiles.
+**Controls:** Users can select an asset and period, or introduce a second asset or period for direct distribution comparisons. The KDE bandwidth can be adjusted from 0.65× to 1.4×, allowing the user to control the smoothness of the estimated density surface. Other controls allow different rolling-volatility windows to be examined. The panel also identifies the volume source used and provides a CSV download of the selected daily returns and corresponding volume percentiles.
 
 ![Panel 4 dashboard showing the joint distribution, risk measures, historical VaR backtest and rolling volatility](assets/panel4_dashboard.png)
 
@@ -362,9 +364,8 @@ These results describe historical relationships and do not establish that tradin
 - The Gaussian KDE uses one bandwidth and can oversmooth heavy-tailed return distributions, particularly near the extreme tails.
 - Low- and high-volume terciles are re-cut within each period. Thus, cross-period comparisons combine a change in returns with a change in the period-specific volume threshold.
 - Missing volume observations are dropped rather than estimated. Across the full 2,971 return dates, Silver has 2,781 aligned observations (about 190 fewer), while Gold has 2,936 (about 35 fewer). Any clustering of missing Silver volume should be checked for year or market-regime bias.
-- Tail-risk estimates are less stable when based on smaller samples. The 95% Expected Shortfall since 2025 rests on about 23 tail observations and has no confidence interval in the current panel.
+- Tail-risk estimates are less stable when based on smaller samples. The 95% Expected Shortfall since 2025 rests on about 23 tail observations, so its bootstrap 95% interval (3.09-4.83%) is wide.
 - The 2026 YTD figures in the dashboard and any 2026-labelled tables are partial-year estimates and should not be treated as full-year results.
-- The Panel 2 since-2025 return count differs from Panel 4; this cross-panel mismatch should be reconciled by the relevant panel owner before exact sample counts are compared.
 - Statistical tests rely on assumptions that may not fully hold for financial returns, particularly where volatility clustering is present. Their results should therefore be treated with some caution.
 - The volume-gap and Expected Shortfall bootstrap intervals use fixed-seed IID resampling and do not model serial dependence or volatility clustering.
 - Oil's 2020 extreme move should be checked against Brent contract and exchange-calendar conventions; the saved Brent-observation fall was -24.40% simple around 20–21 April 2020. Copper's 31 July 2025 fall is not a missing-date gap, but futures-roll effects cannot be excluded from the macro-series-only check.
