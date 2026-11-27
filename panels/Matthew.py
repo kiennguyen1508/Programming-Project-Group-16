@@ -374,16 +374,17 @@ def render():
     else:
         cutoff = st.slider("Significance Level", min_value=0.01, max_value=0.20,
                         value=0.05, step=0.01, format="%.2f", key="p3_cutoff")
-    a = st.session_state.get("p3_pair_a", assets[0])
-    b = st.session_state.get("p3_pair_b", assets[min(2, len(assets) - 1)])
+    
 
                         
-
     # 2. Checking the choices make sense.
     period = returns.loc[str(start):str(end)]
     if len(assets) < 2 or len(period) < 30:
         st.warning("Please pick at least two assets and a period of at least 30 trading days to compare.")
         return
+
+    a = st.session_state.get("p3_pair_a", assets[0])
+    b = st.session_state.get("p3_pair_b", assets[min(2, len(assets) - 1)])
 
     # 3. Heatmap for the selected period.
     if view == "Correlation Heatmap":
