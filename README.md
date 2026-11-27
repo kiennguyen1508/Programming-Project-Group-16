@@ -126,11 +126,11 @@ Programming-Project-Group-16/
 Each panel has its own "Method and Limitations" section in the app with the details.
 
 ### Panel 1: Regression analysis of silver, oil and gold (Charlie O'Sullivan)
-**Question:** How did silver respond to gold during the 2025 boom and 2026 crash? Did silver behave more like a precious or industrial metal, and did the oil–gold relationship change in 2026 amid tensions involving Iran?
+**Question:** How did silver respond to gold during the 2025 boom and 2026 crash? Did silver behave more like a precious or industrial metal, and did the oil-gold relationship change in 2026 amid tensions involving Iran?
 
 **Link to the main question:** Gold is the explanatory variable in every regression, so each β shows how silver or oil moved with gold, and whether that changed after 2025.
 
-**Data:** Daily log returns for gold, silver and Brent oil from `prices.csv`, and copper from `macro.csv`, loaded through `data_loader.py`. Silver rose 288% from the start of 2025 to its peak on 26 January 2026, then fell 57%. The panel splits the data at that peak (Before: 2015–2024; Boom: January 2025 to the peak; Crash: after the peak) or by calendar year (2015–2024, 2025 and 2026 YTD).
+**Data:** Daily log returns for gold, silver and Brent oil from `prices.csv`, and copper from `macro.csv`, loaded through `data_loader.py`. Silver rose 288% from the start of 2025 to its peak on 26 January 2026, then fell 57%. The panel splits the data at that peak (Before: 2015-2024; Boom: January 2025 to the peak; Crash: after the peak) or by calendar year (2015-2024, 2025 and 2026 YTD).
 
 **Data preprocessing:** How the raw prices are turned into the data the regressions use.
 1. **Raw data.** Daily closing prices for gold (`GC=F`), silver (`SI=F`), Brent crude (`BZ=F`) and the S&P 500 are downloaded from Yahoo Finance by `data_loader.py` and saved in `data/prices.csv`. Only dates when all four assets traded are retained. Copper futures (`HG=F`) come from `data/macro.csv`.
@@ -340,7 +340,7 @@ These comparisons are descriptive and do not establish a causal relationship bet
 
 | Member | Panel | Work done |
 |---|---|---|
-| Charlie O'Sullivan | Regression analysis of silver, oil and gold | Built the regression panel and its period comparisons, charts and statistical summaries. |
+| Charlie O'Sullivan | Regression analysis of silver, oil and gold | Built Panel 1 (`panels/Charlie.py`), including the hand-calculated regressions with robust standard errors, boom and crash comparisons, scatter, dot and whisker and 3D charts, and plain-English results. Checked the regressions against statsmodels in `charlie_regression.ipynb` and wrote the Panel 1 README section. Shared work: built the first Streamlit version of `app.py`, with all four panels as "coming soon" placeholders. |
 | Kien Nguyen | Performance & ratios | Built Panel 2 (`panels/Kien.py`): the performance table, growth/drawdown/replay charts, stress-day comparison with a Welch t-test, and the ratio reversion test; wrote the Panel 2 README section. Shared work: set up the repository and folder structure; built `data_loader.py` (price download, `get_prices()`, `get_returns()`, then the macro data with `get_macro()` and `get_macro_changes()`); built the overview grid in `app.py` and the dark theme; wrote the shared README sections; kept `requirements.txt` up to date. |
 | Matthew Herbert | Correlation heatmap | Built Panel 3 (`panels/Matthew.py`), including the significance-masked heatmap, rolling correlations, animated timeline and decoupling analysis. Documented Panel 3 and contributed to dashboard layout and debugging. |
 | Michael Gilgunn | Distribution & risk | Built Panel 4 (`panels/Michael.py`), including the joint-distribution visualisation, risk measures, volume handling, backtests and statistical comparisons. |
