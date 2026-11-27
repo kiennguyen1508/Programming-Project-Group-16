@@ -38,7 +38,7 @@ Sortino ratio = the same numerator ÷ downside deviation, which only counts days
 
 Copper is COMEX copper futures (HG=F, $ per pound) from the shared macro file. The Gold/Copper ratio compares a safe-haven asset with an industrial one: it tends to rise when markets fear a slowdown and fall when they expect growth.
 
-**Calm vs stressed days.** VIX closes from Cboe, via the shared macro file. A day counts as stressed if the VIX closed at or above the chosen level (default 25) on the previous trading day. Yesterday’s VIX is used because today’s VIX rises because stocks are falling today, which would make the comparison circular. Averages from fewer than about 20 days are unreliable. The chart shows the average or median daily return (you can switch between them). The median gives a similar ranking and is less affected by a few extreme days.
+**Calm vs stressed days.** VIX closes from Cboe, via the shared macro file. A day counts as stressed if the VIX closed at or above the chosen level (default 25) on the previous trading day. Yesterday’s VIX is used because today’s VIX rises because stocks are falling today, which would make the comparison circular. Averages from fewer than about 20 days are unreliable. The chart shows the average or median daily return (you can switch between them). The median is less affected by a few extreme days, and gives the same conclusion for gold.
 
 With few stressed days, one extreme day can dominate the average (e.g. the S&P 500’s +9.5% on 9 April 2025), so compare the average with the median and prefer the Max period for conclusions.
 
@@ -68,7 +68,7 @@ def load_vix():
 
 def show_ratios(prices, recent):
     """
-    Ratios tabs: ratio chart, z-score and the reversion test.
+    Ratios tab: ratio chart, z-score and the reversion test.
     """
     name = st.radio("Ratio" , list(RATIOS) , horizontal = True , key = "p1_ratio")
     top, bottom = RATIOS[name]
@@ -91,7 +91,7 @@ def show_ratios(prices, recent):
     st.markdown("**Do extreme readings revert?**")
     horizon = st.select_slider(
         "Look-ahead horizon",
-        options = [21,63,126], # I picked 1, 3 and 6 months (12 trading days is about a month)
+        options = [21,63,126], # I picked 1, 3 and 6 months (21 trading days is about a month)
         value = 63,
         format_func=lambda d: f"{d//21} month{'s' if d > 21 else ''}",
         key = "p1_horizon",
