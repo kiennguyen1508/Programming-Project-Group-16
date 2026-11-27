@@ -50,7 +50,7 @@ All the data the dashboard needs is already saved in `data/`, including the trad
 
 ## Using the dashboard
 
-The dashboard opens on an overview page with a preview of all four panels. Select **Open →** to view a panel and its controls, then **← Back to overview** to return. Each panel includes a **Method and Limitations** section describing its calculations and caveats.
+The dashboard opens on an overview page with a preview of all four panels. Select **Open →** to view a panel and its controls, then **← Back to overview** to return. Each panel ends with a section explaining its method and limitations.
 
 ![Overview page with a preview of all four panels](assets/overview.png)
 
@@ -124,7 +124,7 @@ Programming-Project-Group-16/
 ```
 
 ## The panels
-Each panel has its own "Method and Limitations" section in the app with the details.
+Each panel also explains its method and limitations in the app.
 
 ### Panel 1: Regression analysis of silver, oil and gold (Charlie O'Sullivan)
 **Question:** How did silver respond to gold during the 2025 boom and 2026 crash? Did silver behave more like a precious or industrial metal, and did the oil-gold relationship change in 2026 amid tensions involving Iran?
@@ -230,7 +230,7 @@ Saved data to 30 Oct 2026; the settings to reproduce each finding are in bracket
 - `data/macro.csv`: Daily levels for commodities, the US dollar and Copper, plus the 10-year real yield and VIX. The panel loads this file with its `load_macro()` function.
 - `data/VIX_History.csv`: Supplies the VIX values used in `macro.csv`.
 
-Gold, Silver, Oil and the S&P 500 use daily log returns. Commodity, dollar and VIX series use daily percentage changes; the real yield uses the daily change in percentage points. Dates with incomplete data are excluded from the panel's complete-case analysis.
+Gold, Silver, Oil and the S&P 500 use daily log returns. Commodity, dollar, copper and VIX series use daily percentage changes; the real yield uses the daily change in percentage points. Dates with incomplete data are excluded from the panel's complete-case analysis.
 
 **1. Loading the data.** The panel uses two saved files, so it runs without internet:
 - `data/prices.csv` (2,972 trading days, 2 Jan 2015 to 30 Oct 2026): Gold, Silver, Brent Oil and the S&P 500. It is read through the shared `get_returns()` function in `data_loader.py`.
@@ -270,7 +270,7 @@ The Animated Timeline groups the data by calendar year, with about 245 to 249 da
 - Over the whole period, gold's strongest link is with silver (r = 0.77). Gold moves against the dollar (r = -0.38) and against real yields (r = -0.30), and has almost no link with the S&P 500, oil or the VIX.
 - Gold's link with real yields mostly faded after 2025. It went from -0.36 before 2025 to -0.10 since, which is a significant change (Fisher z-test, p < 0.001). The textbook "higher real yields hurt gold" link broke down during the boom.
 - 25 of the 36 pairs changed significantly after 2025. The biggest changes are in oil, which almost stopped moving with the S&P 500 (0.28 to -0.09) and copper (0.28 to -0.06).
-- Gold and silver stayed tightly linked throughout. Their 90-day rolling correlation never fell below 0.50, and in the crash after the silver peak it rose to 0.84, higher than in the boom (0.64).
+- Gold and silver stayed tightly linked throughout. Their 90-day rolling correlation never fell below 0.50, and over the crash as a whole their correlation was 0.84, higher than in the boom (0.64).
 - In the crash, gold started moving with the S&P 500 (r = 0.36, against roughly zero before) and against the VIX (r = -0.30). This suggests gold was sold off alongside stocks rather than acting as a safe haven.
 
 **Limitations:** Correlation only measures straight-line links and says nothing about cause. Daily closing times differ across markets, which can weaken some links. Rolling correlations depend on the window chosen, and the boom and crash periods are short, so their estimates are less certain.
