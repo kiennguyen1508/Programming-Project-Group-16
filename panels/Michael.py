@@ -819,8 +819,7 @@ def render():
     st.subheader("Distribution & Risk")
     st.caption("By Michael Gilgunn")
     st.caption(
-        "Research question: How has the relationship between daily price changes "
-        "and trading activity evolved since 2025, and was the change distinct for Gold?"
+        "Research question: How bad is a bad day for gold, and how has its daily risk changed since 2025?"
     )
 
     try:
@@ -853,7 +852,7 @@ def render():
     with c2:
         selected_period = st.segmented_control(
             "Analysis period",
-            PERIODS[:3],
+            PERIODS,
             default=PERIODS[0],
             key="p4_primary_period",
         ) or PERIODS[0]
@@ -889,7 +888,7 @@ def render():
         with cc2:
             compare_period = st.segmented_control(
                 "Comparison period",
-                PERIODS[:3],
+                PERIODS,
                 default=PERIODS[1],
                 key="p4_compare_period",
             ) or PERIODS[1]
