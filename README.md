@@ -75,7 +75,7 @@ Before refreshing, note three things:
 
 The Distribution & Risk panel downloads new volume data by itself only if `data/volume_history.csv` does not cover the dates it needs. To force a fresh download, delete `data/volume_history.csv` and `data/volume_history_sources.json`, then restart the app while online.
 
-### Running the regression notebook (optional choice from user)
+### Running the regression notebook (optional)
 
 `charlie_regression.ipynb` checks Panel 1's hand-calculated regressions against `statsmodels`. It is not needed for the dashboard and needs two extra packages:
 ```bash
@@ -110,7 +110,7 @@ Programming-Project-Group-16/
 │   ├── Matthew.py            # correlation heatmap
 │   └── Michael.py            # distribution and risk
 ├── charlie_regression.ipynb  # notebook used while building the regression panel
-└── assets/                   # screenshot used in this README
+└── assets/                   # screenshots used in this README
 ```
 
 ## The panels
@@ -201,7 +201,7 @@ Saved data to 30 Oct 2026; the settings to reproduce each finding are in bracket
 - **Gold is in its deepest fall since 2015.** It peaked at $5,318 on 29 Jan 2026 and closed at $3,899 on 30 Oct 2026, a 26.7% drawdown. That is deeper than any fall from 2015 to 2024 (the worst was about 21%). *[Performance, Max, Drawdown]*
 - **Gold did not reliably protect investors on fear days.** On the 391 stressed days, gold averaged +0.01% a day against +0.05% on calm days, while the S&P 500 averaged +0.13% on stressed days. The median gives the same ranking. None of the gaps is statistically significant (Welch t-test: gold p = 0.53, S&P 500 p = 0.41), so gold behaved about the same on fear days as on normal days. *[Stress days, Max, VIX 25]*
 - **Since 2025 gold did rise on stressed days, but so did everything else.** On the 34 stressed days, gold averaged +0.18% (+0.09% on calm days), but the S&P 500 averaged +0.28% and silver +0.27%. None of these gaps is significant at 5% (gold p = 0.83). This looks like markets bouncing back after fear spikes, not gold protecting investors, and 34 days is a small sample. *[Stress days, Since 2025, VIX 25]*
-- **Only the gold/silver ratio reliably moved back to its average.** After being more than 2σ from its rolling 5-year average, it moved back within 3 months 81% of the time, against a base rate of 43–57%. Gold/oil (53% vs 47%) and gold/copper (54% vs 45%) were barely better than chance. Today the gold/silver ratio is 79.4, right at its average (z = −0.04, 50th percentile), so there is no signal now. *[Ratios, 3 months]*
+- **Only the gold/silver ratio reliably moved back to its average.** After being more than 2σ from its rolling 5-year average, it moved back within 3 months 81% of the time, against a base rate of 43–57%. Gold/oil (53% vs 47%) and gold/copper (54% vs 45%) were barely better than chance.On 30 Oct 2026 the gold/silver ratio was 79.4, right at its average (z = −0.04, 50th percentile), so there was no signal at the end of the data. *[Ratios, 3 months]*
 
 #### Limitations
 - The "since 2025" period is under two years and has only 34 stressed days, so those results are less certain than the full-period ones.
@@ -331,15 +331,15 @@ These comparisons are descriptive and do not establish a causal relationship bet
 
 ## Contributions
 
-| Member | Panel | Shared work |
+| Member | Panel | Work done |
 |---|---|---|
 | Charlie O'Sullivan | Regression analysis of silver, oil and gold | Built the regression panel and its period comparisons, charts and statistical summaries. |
-| Kien Nguyen | Performance & ratios | Set up the repository and folder structure; built `data_loader.py` (price download, `get_prices()`, `get_returns()`) and later added the macro data (`get_macro()`, `get_macro_changes()`); built the overview grid in `app.py` and the dark theme; wrote the README apart from the other panel sections; kept `requirements.txt` up to date |
+| Kien Nguyen | Performance & ratios | Built Panel 2 (`panels/Kien.py`): the performance table, growth/drawdown/replay charts, stress-day comparison with a Welch t-test, and the ratio reversion test; wrote the Panel 2 README section. Shared work: set up the repository and folder structure; built `data_loader.py` (price download, `get_prices()`, `get_returns()`, then the macro data with `get_macro()` and `get_macro_changes()`); built the overview grid in `app.py` and the dark theme; wrote the shared README sections; kept `requirements.txt` up to date. |
 | Matthew Herbert | Correlation heatmap | Built Panel 3 (`panels/Matthew.py`), including the significance-masked heatmap, rolling correlations, animated timeline and decoupling analysis. Documented Panel 3 and contributed to dashboard layout and debugging. |
 | Michael Gilgunn | Distribution & risk | Built Panel 4 (`panels/Michael.py`), including the joint-distribution visualisation, risk measures, volume handling, backtests and statistical comparisons. |
 
 ## Limitations
-- Gold, silver, oil and copper are future prices, which jump slightly when contracts roll over.
+- Gold, silver, oil and copper are futures prices, which jump slightly when contracts roll over.
 - The S&P 500 is a price index, so it does not include dividends.
 - The saved data stops on 30 October 2026. See "Refreshing the data" for how to update it and how that affects the results.
 - The "since 2025" period is less than two years long, so its results are less reliable than the 2015–2024 ones.
