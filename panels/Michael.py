@@ -457,7 +457,8 @@ def max_drawdown_from_log_returns(log_returns):
     if r.empty:
         return np.nan
     wealth = np.exp(r.cumsum())
-    return float((wealth / wealth.cummax() - 1).min())
+    running_peak = wealth.cummax().clip(lower=1.0)
+    return float((wealth / running_peak - 1).min())
 
 
 def risk_statistics(series):
