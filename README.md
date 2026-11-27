@@ -1,8 +1,8 @@
-# Gold and its Drivers: Economic & Finance Dashboard
+# What Drives Gold? An Interactive Analysis of Returns, Correlations, Risk and Market Links
 
-**Main question:** What Drives Gold? An Interactive Analysis of Returns, Correlations, Risk and Market Links.
+**Main question:** What drives the price of gold, and has its behaviour changed since 2025?
 
-This interactive dashboard looks at gold alongside silver, oil, the S&P 500 and several economic factors, using daily data from 2015 to October 2026. Each panel answers one part of the main question and compares 2015–2024 with the period since 2025.
+This interactive dashboard looks at gold alongside silver, oil, the S&P 500 and several economic factors (the US dollar, copper, a broad commodity index, the 10-year real yield and the VIX), using daily data from 2 January 2015 to 30 October 2026. Each of the four panels answers one part of the main question, and each compares the years before 2025 with the period since.
 
 ## Quick start
 
