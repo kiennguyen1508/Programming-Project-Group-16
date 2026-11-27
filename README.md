@@ -4,6 +4,15 @@
 
 This interactive dashboard looks at gold alongside silver, oil, the S&P 500 and several economic factors (the US dollar, copper, a broad commodity index, the 10-year real yield and the VIX), using daily data from 2 January 2015 to 30 October 2026. Each of the four panels answers one part of the main question, and each compares the years before 2025 with the period since.
 
+## What we found
+In this data, gold moved mostly closely with silver and against the US dollar and real yields, and since 2025 its behaviour clearly changed:
+- **The textbook drivers weakened.** Gold's negative link with real yields almost disappeared after 2025 (r = −0.36 before, −0.10 since; Panel 3), so higher real yields no longer held gold back during the boom.
+- **Gold became a higher-return, higher-risk asset.** Since 2025 it returned 23.2% a year with 25.1% volatility, against 10.6% and 16.8% over the full period, and it is now in its deepest fall since 2015 (−26.7% from its January 2026 peak; Panel 2).
+- **It did not act as a reliable safe haven.** Gold's returns on high-fear days were not significantly different from normal days (Panel 2), and in the 2026 crash it moved *with* the S&P 500 (r = 0.36) rather than against it (Panel 3).
+- **Silver amplified gold throughout.** Silver moved more than one-for-one with gold in every period (β 1.51 before 2025, 1.93 in the crash) and tracked gold far more than copper, so it behaved as a precious metal rather than an industrial one (Panel 1).
+<!-- Panel 4: Wait for Gilgunn's key finding-->
+These are links in past data, not proof of what causes gold's moves. Each panel's section below explains how its result was calculated and its limitations.
+
 ## Quick start
 
 You need Python 3.12 or newer (check with `python3 --version`). Tested with Python 3.14.7 on macOS.
@@ -270,9 +279,7 @@ The Animated Timeline groups the data by calendar year, with about 245 to 249 da
 - `data/macro.csv`: Copper price data, accessed through `get_macro()` and `get_macro_changes()`.
 - Yahoo Finance: Daily trading-volume data. Futures volume is used where sufficient historical coverage is available; otherwise, an ETF proxy is used: GLD (Gold), SLV (Silver), CPER (Copper), USO (Oil) or SPY (S&P 500).
 - `data/volume_history_sources.json`: Records which volume source is used for each asset.
-| `data/DFII10.csv` | A saved copy of the 10-year real yield. Not read by any code: `data_loader.py` downloads the real yield directly from FRED. Kept for reference. | FRED |
-| `data/GVZCLS.csv`, `data/SKEW.csv` | Gold volatility index and Cboe SKEW index, downloaded while exploring extra drivers. Not used by any panel. | FRED, Cboe |
-| `data/volume_percentiles.csv`, `data/volume_percentiles_sources.json` | An older version of Panel 4's volume data that ranked volume against the full sample (which would use future information). Replaced by `volume_history.csv` and no longer used. | Yahoo Finance |
+
 
 Volume data is cached locally in `data/volume_history.csv`, so it does not need to be downloaded again on every run. Raw trading volume is converted into a trailing 252-observation percentile for each instrument. Each percentile uses only observations available up to that date, avoiding look-ahead bias. A percentile of 90 means trading activity was higher than approximately 90% of the instrument's previous observations. This allows activity to be compared across markets with very different trading volumes.
 
