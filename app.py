@@ -3,7 +3,7 @@ from panels import Charlie, Kien, Matthew, Michael
 
 st.set_page_config(page_title="What Drives Gold? An Interactive Analysis of Returns, Correlations, Risk and Market Links: 2015-2026", layout="wide")
 
-# 1. One entry per panel: its title, the quesion it answers,
+# 1. One entry per panel: its title, the question it answers,
 #    and the function that draws the full panel
 PANELS = {
     "regression" : {
