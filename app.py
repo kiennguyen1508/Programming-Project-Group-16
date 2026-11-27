@@ -39,7 +39,7 @@ if "focus" not in st.session_state:
 def open_panel(key):
     st.session_state.focus = key
 
-# 3. What one overview card looks like (placeholder for now)
+# 3. Draw one overview card
 def overview_card(key, info):
     number = list(PANELS).index(key) + 1
     with st.container(border=True, height=560):
@@ -79,4 +79,3 @@ else:
     info = PANELS[st.session_state.focus]
     st.button("← Back to overview", on_click=open_panel, args=(None,))
     info["full"]()  
-
